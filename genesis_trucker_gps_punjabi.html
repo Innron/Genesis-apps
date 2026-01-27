@@ -380,7 +380,7 @@
         <div class="title">Genesis Trucker GPS</div>
         <div class="subtitle">ਟਰੱਕਰ GPS ਐਪ<br>Truck-friendly navigation</div>
         
-        <input type="text" class="code-input" id="inviteCode" placeholder="TRUCK-XXXXX" maxlength="11">
+        <input type="text" class="code-input" id="inviteCode" placeholder="Enter code" maxlength="12">
         <button class="btn btn-primary" onclick="validateCode()">🔓 Enter App / ਐਪ ਖੋਲ੍ਹੋ</button>
         <div class="error-msg" id="codeError">❌ Invalid code</div>
     </div>
@@ -638,50 +638,48 @@
         }
         
         function validateCode() {
-            const code = document.getElementById('inviteCode').value.trim().toUpperCase();
+            let code = document.getElementById('inviteCode').value.trim().toUpperCase();
             const errorEl = document.getElementById('codeError');
             
-            if (!code) {
+            // Auto-add TRUCK- prefix if not present
+            if (!code.startsWith('TRUCK-')) {
+                code = 'TRUCK-' + code;
+            }
+            
+            if (!code || code.length < 9) {
                 errorEl.textContent = '❌ Please enter code / ਕੋਡ ਦਿਓ';
                 errorEl.classList.add('show');
                 return;
             }
             
-            if (!code.startsWith('TRUCK-') || code.length !== 11) {
-                errorEl.textContent = '❌ Invalid format. Use: TRUCK-XXXXX';
-                errorEl.classList.add('show');
+            // For now, accept any properly formatted code
+            // Format: TRUCK-XXXXX (at least 5 chars after prefix)
+            if (code.startsWith('TRUCK-') && code.length >= 11) {
+                localStorage.setItem('trucker_validated_code', code);
+                errorEl.classList.remove('show');
+                showScreen('setupScreen');
                 return;
             }
             
-            // Check code in localStorage (shared with admin panel)
+            // Also check localStorage codes (if on same device)
             const codes = JSON.parse(localStorage.getItem(CODES_KEY) || '[]');
             const codeObj = codes.find(c => c.code === code);
             
-            if (!codeObj) {
-                errorEl.textContent = '❌ Code not found / ਕੋਡ ਨਹੀਂ ਮਿਲਿਆ';
-                errorEl.classList.add('show');
-                return;
+            if (codeObj) {
+                if (codeObj.status === 'revoked') {
+                    errorEl.textContent = '❌ Code revoked / ਕੋਡ ਰੱਦ ਕੀਤਾ';
+                    errorEl.classList.add('show');
+                    return;
+                }
+                
+                if (codeObj.appType !== 'trucker') {
+                    errorEl.textContent = '❌ Wrong code type. Use TRUCK code';
+                    errorEl.classList.add('show');
+                    return;
+                }
             }
             
-            if (codeObj.status === 'revoked') {
-                errorEl.textContent = '❌ Code revoked / ਕੋਡ ਰੱਦ ਕੀਤਾ';
-                errorEl.classList.add('show');
-                return;
-            }
-            
-            if (codeObj.status === 'used') {
-                errorEl.textContent = '❌ Code already used / ਕੋਡ ਵਰਤਿਆ ਜਾ ਚੁੱਕਾ';
-                errorEl.classList.add('show');
-                return;
-            }
-            
-            if (codeObj.appType !== 'trucker') {
-                errorEl.textContent = '❌ Wrong app code. Need TRUCK-XXXXX';
-                errorEl.classList.add('show');
-                return;
-            }
-            
-            // Valid!
+            // Accept the code
             localStorage.setItem('trucker_validated_code', code);
             errorEl.classList.remove('show');
             showScreen('setupScreen');

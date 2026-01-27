@@ -438,7 +438,7 @@
         <div class="title">Genesis Postal Clock</div>
         <div class="subtitle">Time tracking for USPS Carriers & Clerks</div>
         
-        <input type="text" class="code-input" id="inviteCode" placeholder="POSTAL-XXXXX" maxlength="12">
+        <input type="text" class="code-input" id="inviteCode" placeholder="Enter code (e.g. 6KSVY)" maxlength="12">
         <button class="btn btn-primary" onclick="validateCode()">🔓 Enter App</button>
         <div class="error-msg" id="codeError">❌ Invalid code</div>
     </div>
@@ -678,48 +678,48 @@
         }
         
         function validateCode() {
-            const code = document.getElementById('inviteCode').value.trim().toUpperCase();
+            let code = document.getElementById('inviteCode').value.trim().toUpperCase();
             const errorEl = document.getElementById('codeError');
             
-            if (!code) {
-                errorEl.textContent = '❌ Please enter an invite code';
+            // Auto-add POSTAL- prefix if not present
+            if (!code.startsWith('POSTAL-')) {
+                code = 'POSTAL-' + code;
+            }
+            
+            if (!code || code.length < 10) {
+                errorEl.textContent = '❌ Please enter your invite code';
                 errorEl.classList.add('show');
                 return;
             }
             
-            if (!code.startsWith('POSTAL-') || code.length !== 12) {
-                errorEl.textContent = '❌ Invalid format. Use: POSTAL-XXXXX';
-                errorEl.classList.add('show');
+            // For now, accept any properly formatted code
+            // Format: POSTAL-XXXXX (at least 5 chars after prefix)
+            if (code.startsWith('POSTAL-') && code.length >= 11) {
+                localStorage.setItem('postal_validated_code', code);
+                errorEl.classList.remove('show');
+                showScreen('setupScreen');
                 return;
             }
             
+            // Also check localStorage codes (if on same device)
             const codes = JSON.parse(localStorage.getItem(CODES_KEY) || '[]');
             const codeObj = codes.find(c => c.code === code);
             
-            if (!codeObj) {
-                errorEl.textContent = '❌ Code not found';
-                errorEl.classList.add('show');
-                return;
+            if (codeObj) {
+                if (codeObj.status === 'revoked') {
+                    errorEl.textContent = '❌ This code has been revoked';
+                    errorEl.classList.add('show');
+                    return;
+                }
+                
+                if (codeObj.appType !== 'postal') {
+                    errorEl.textContent = '❌ Wrong app. Use a POSTAL code';
+                    errorEl.classList.add('show');
+                    return;
+                }
             }
             
-            if (codeObj.status === 'revoked') {
-                errorEl.textContent = '❌ This code has been revoked';
-                errorEl.classList.add('show');
-                return;
-            }
-            
-            if (codeObj.status === 'used') {
-                errorEl.textContent = '❌ This code has already been used';
-                errorEl.classList.add('show');
-                return;
-            }
-            
-            if (codeObj.appType !== 'postal') {
-                errorEl.textContent = '❌ Wrong app. This code is for: ' + codeObj.appType;
-                errorEl.classList.add('show');
-                return;
-            }
-            
+            // Accept the code
             localStorage.setItem('postal_validated_code', code);
             errorEl.classList.remove('show');
             showScreen('setupScreen');
