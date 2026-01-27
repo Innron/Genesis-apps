@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>📫 Genesis Postal Clock</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+        
+        .screen { display: none; min-height: 100vh; }
+        .screen.active { display: block; }
+        
+        /* CODE SCREEN */
+        .code-screen {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 40px 20px;
+        }
+        
+        .logo { font-size: 80px; margin-bottom: 20px; }
+        .title { font-size: 28px; font-weight: 700; margin-bottom: 10px; }
+        .subtitle { color: #aaa; margin-bottom: 30px; text-align: center; }
+        
+        .code-input {
+            width: 100%;
+            max-width: 300px;
+            padding: 18px;
+            font-size: 20px;
+            text-align: center;
+            border: 3px solid #333;
+            border-radius: 15px;
+            background: #111;
+            color: #00ff88;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+        }
+        
+        .code-input:focus { outline: none; border-color: #0984e3; }
+        
+        .btn {
+            width: 100%;
+            max-width: 300px;
+            padding: 18px;
+            margin-top: 15px;
+            border: none;
+            border-radius: 15px;
+            font-size: 18px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #0984e3 0%, #74b9ff 100%);
+            color: #fff;
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, #00b894 0%, #00cec9 100%);
+            color: #000;
+        }
+        
+        .btn-danger {
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            color: #fff;
+        }
+        
+        .error-msg {
+            color: #ff6b6b;
+            margin-top: 15px;
+            text-align: center;
+            display: none;
+        }
+        
+        .error-msg.show { display: block; }
+        
+        /* SETUP SCREEN */
+        .setup-container {
+            padding: 30px 20px;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+        
+        .setup-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .form-card {
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 15px;
+        }
+        
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #ccc;
+        }
+        
+        .form-input, .form-select {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid rgba(255,255,255,0.2);
+            border-radius: 12px;
+            background: rgba(0,0,0,0.3);
+            color: #fff;
+            font-size: 16px;
+        }
+        
+        .form-input:focus, .form-select:focus {
+            outline: none;
+            border-color: #0984e3;
+        }
+        
+        /* MAIN APP */
+        .app-header {
+            background: linear-gradient(135deg, #0984e3 0%, #74b9ff 100%);
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .app-title { font-size: 20px; font-weight: 700; }
+        
+        .employee-badge {
+            display: inline-block;
+            background: rgba(0,0,0,0.2);
+            padding: 8px 15px;
+            border-radius: 20px;
+            margin-top: 10px;
+            font-size: 12px;
+        }
+        
+        .date-display {
+            background: #111;
+            padding: 15px;
+            text-align: center;
+            font-size: 14px;
+            color: #aaa;
+        }
+        
+        .main-content { padding: 20px; }
+        
+        /* STATUS CARD */
+        .status-card {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            border-radius: 20px;
+            padding: 25px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .status-label { font-size: 14px; color: rgba(255,255,255,0.7); margin-bottom: 5px; }
+        .status-value { font-size: 48px; font-weight: 800; font-family: 'Courier New', monospace; }
+        .status-route { font-size: 16px; color: #74b9ff; margin-top: 10px; }
+        
+        /* ACTIVITY SELECTOR */
+        .activity-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .activity-btn {
+            background: rgba(255,255,255,0.1);
+            border: 2px solid transparent;
+            border-radius: 12px;
+            padding: 15px 10px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .activity-btn.selected {
+            background: rgba(9, 132, 227, 0.3);
+            border-color: #0984e3;
+        }
+        
+        .activity-icon { font-size: 24px; display: block; margin-bottom: 5px; }
+        .activity-name { font-size: 11px; color: #ccc; }
+        
+        /* ROUTE INPUT */
+        .route-input-group {
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .route-input-label { font-size: 12px; color: #aaa; margin-bottom: 8px; }
+        
+        .route-input {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            background: rgba(0,0,0,0.3);
+            color: #fff;
+            font-size: 18px;
+            text-align: center;
+        }
+        
+        /* ACTION BUTTONS */
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .action-btn {
+            flex: 1;
+            padding: 18px;
+            border: none;
+            border-radius: 15px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        
+        .btn-clock-in {
+            background: linear-gradient(135deg, #00b894 0%, #00cec9 100%);
+            color: #000;
+        }
+        
+        .btn-clock-out {
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            color: #fff;
+        }
+        
+        .btn-switch {
+            background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+            color: #000;
+        }
+        
+        .btn-lunch {
+            background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);
+            color: #fff;
+        }
+        
+        /* TODAY'S ROUTES */
+        .routes-section {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .routes-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .routes-title { font-weight: 600; }
+        
+        .route-item {
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .route-info { flex: 1; }
+        .route-name { font-weight: 600; font-size: 14px; }
+        .route-activity { font-size: 12px; color: #aaa; }
+        .route-time { font-family: monospace; font-weight: 600; color: #00ff88; }
+        
+        /* TOTALS */
+        .totals-card {
+            background: linear-gradient(135deg, #2d3436 0%, #636e72 100%);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .totals-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+        
+        .total-item { text-align: center; }
+        .total-label { font-size: 12px; color: #aaa; }
+        .total-value { font-size: 24px; font-weight: 700; color: #00ff88; }
+        
+        /* GREEN CARD BUTTON */
+        .green-card-btn {
+            width: 100%;
+            padding: 18px;
+            background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+            border: none;
+            border-radius: 15px;
+            color: #fff;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+        
+        /* MODAL */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            padding: 20px;
+        }
+        
+        .modal.show { display: flex; }
+        
+        .modal-content {
+            background: #1a1a2e;
+            border-radius: 20px;
+            padding: 25px;
+            width: 100%;
+            max-width: 400px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .modal-title { font-size: 18px; font-weight: 700; }
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: #fff;
+            cursor: pointer;
+        }
+        
+        .green-card-output {
+            background: #111;
+            border-radius: 10px;
+            padding: 15px;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            color: #00ff88;
+            margin-bottom: 15px;
+        }
+        
+        /* NAV BAR */
+        .nav-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #111;
+            display: flex;
+            padding: 10px 0;
+            padding-bottom: max(10px, env(safe-area-inset-bottom));
+        }
+        
+        .nav-item {
+            flex: 1;
+            text-align: center;
+            padding: 10px;
+            background: none;
+            border: none;
+            color: #666;
+            cursor: pointer;
+        }
+        
+        .nav-item.active { color: #0984e3; }
+        .nav-icon { font-size: 20px; display: block; }
+        .nav-label { font-size: 10px; margin-top: 3px; }
+        
+        .content-area { padding-bottom: 80px; }
+        
+        /* HISTORY TAB */
+        .history-item {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 10px;
+        }
+        
+        .history-date { font-weight: 600; margin-bottom: 8px; }
+        .history-routes { font-size: 13px; color: #aaa; }
+        .history-total { font-size: 16px; font-weight: 600; color: #00ff88; margin-top: 8px; }
+        
+        /* SETTINGS TAB */
+        .settings-section {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .settings-title { font-weight: 600; margin-bottom: 15px; }
+        
+        .setting-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .setting-item:last-child { border-bottom: none; }
+        
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <!-- CODE ENTRY SCREEN -->
+    <div id="codeScreen" class="screen active code-screen">
+        <div class="logo">📫</div>
+        <div class="title">Genesis Postal Clock</div>
+        <div class="subtitle">Time tracking for USPS Carriers & Clerks</div>
+        
+        <input type="text" class="code-input" id="inviteCode" placeholder="POSTAL-XXXXX" maxlength="12">
+        <button class="btn btn-primary" onclick="validateCode()">🔓 Enter App</button>
+        <div class="error-msg" id="codeError">❌ Invalid code</div>
+    </div>
+    
+    <!-- SETUP SCREEN -->
+    <div id="setupScreen" class="screen">
+        <div class="setup-container">
+            <div class="setup-header">
+                <div class="logo">📫</div>
+                <h2>Employee Setup</h2>
+                <p style="color:#aaa; margin-top:10px;">Set up your profile to get started</p>
+            </div>
+            
+            <div class="form-card">
+                <label class="form-label">Your Name</label>
+                <input type="text" class="form-input" id="employeeName" placeholder="e.g., John Smith">
+            </div>
+            
+            <div class="form-card">
+                <label class="form-label">Employee Type</label>
+                <select class="form-select" id="employeeType" onchange="updateCarrierOptions()">
+                    <option value="">Select type...</option>
+                    <option value="carrier">Carrier</option>
+                    <option value="clerk">Clerk</option>
+                </select>
+            </div>
+            
+            <div class="form-card hidden" id="carrierTypeGroup">
+                <label class="form-label">Carrier Type</label>
+                <select class="form-select" id="carrierType">
+                    <option value="cca">CCA (City Carrier Assistant)</option>
+                    <option value="regular">Regular Carrier</option>
+                    <option value="ptf">PTF (Part-Time Flexible)</option>
+                    <option value="rca">RCA (Rural Carrier Associate)</option>
+                    <option value="arc">ARC (Assistant Rural Carrier)</option>
+                </select>
+            </div>
+            
+            <div class="form-card">
+                <label class="form-label">Office Location</label>
+                <input type="text" class="form-input" id="officeLocation" placeholder="e.g., Dallas Main Office">
+            </div>
+            
+            <button class="btn btn-success" onclick="completeSetup()">✅ Complete Setup</button>
+        </div>
+    </div>
+    
+    <!-- MAIN APP SCREEN -->
+    <div id="mainScreen" class="screen">
+        <div class="app-header">
+            <div class="app-title">📫 Genesis Postal Clock</div>
+            <div class="employee-badge" id="employeeBadge">CCA - John Smith</div>
+        </div>
+        
+        <div class="date-display" id="dateDisplay">Monday, January 27, 2026</div>
+        
+        <div class="content-area">
+            <!-- CLOCK TAB -->
+            <div id="clockTab" class="tab-content">
+                <div class="main-content">
+                    <div class="status-card">
+                        <div class="status-label" id="statusLabel">Ready to Clock In</div>
+                        <div class="status-value" id="timerDisplay">00:00:00</div>
+                        <div class="status-route" id="currentRouteDisplay"></div>
+                    </div>
+                    
+                    <div class="route-input-group" id="routeInputGroup">
+                        <div class="route-input-label">Route Number</div>
+                        <input type="text" class="route-input" id="routeNumber" placeholder="e.g., Route 5">
+                    </div>
+                    
+                    <div class="activity-grid" id="activityGrid">
+                        <button class="activity-btn selected" data-activity="casing">
+                            <span class="activity-icon">📬</span>
+                            <span class="activity-name">Casing</span>
+                        </button>
+                        <button class="activity-btn" data-activity="delivering">
+                            <span class="activity-icon">🚶</span>
+                            <span class="activity-name">Delivering</span>
+                        </button>
+                        <button class="activity-btn" data-activity="loading">
+                            <span class="activity-icon">📦</span>
+                            <span class="activity-name">Loading</span>
+                        </button>
+                        <button class="activity-btn" data-activity="office">
+                            <span class="activity-icon">🏢</span>
+                            <span class="activity-name">Office</span>
+                        </button>
+                        <button class="activity-btn" data-activity="travel">
+                            <span class="activity-icon">🚗</span>
+                            <span class="activity-name">Travel</span>
+                        </button>
+                        <button class="activity-btn" data-activity="other">
+                            <span class="activity-icon">📋</span>
+                            <span class="activity-name">Other</span>
+                        </button>
+                    </div>
+                    
+                    <div class="action-buttons" id="mainActions">
+                        <button class="action-btn btn-clock-in" id="clockInBtn" onclick="clockIn()">▶️ Clock In</button>
+                    </div>
+                    
+                    <div class="action-buttons hidden" id="activeActions">
+                        <button class="action-btn btn-switch" onclick="switchRoute()">🔄 Switch</button>
+                        <button class="action-btn btn-lunch" onclick="startLunch()">🍔 Lunch</button>
+                        <button class="action-btn btn-clock-out" onclick="clockOut()">⏹️ Out</button>
+                    </div>
+                    
+                    <div class="routes-section">
+                        <div class="routes-header">
+                            <span class="routes-title">📋 Today's Routes</span>
+                        </div>
+                        <div id="routesList"></div>
+                    </div>
+                    
+                    <div class="totals-card">
+                        <div class="totals-grid">
+                            <div class="total-item">
+                                <div class="total-label">Work Time</div>
+                                <div class="total-value" id="totalWork">0:00</div>
+                            </div>
+                            <div class="total-item">
+                                <div class="total-label">Lunch</div>
+                                <div class="total-value" id="totalLunch">0:00</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button class="green-card-btn" onclick="showGreenCard()">📄 View Green Card Data</button>
+                </div>
+            </div>
+            
+            <!-- HISTORY TAB -->
+            <div id="historyTab" class="tab-content hidden">
+                <div class="main-content">
+                    <h3 style="margin-bottom:20px;">📊 History</h3>
+                    <div id="historyList"></div>
+                </div>
+            </div>
+            
+            <!-- SETTINGS TAB -->
+            <div id="settingsTab" class="tab-content hidden">
+                <div class="main-content">
+                    <h3 style="margin-bottom:20px;">⚙️ Settings</h3>
+                    
+                    <div class="settings-section">
+                        <div class="settings-title">👤 Profile</div>
+                        <div class="setting-item">
+                            <span>Name</span>
+                            <span id="settingsName">-</span>
+                        </div>
+                        <div class="setting-item">
+                            <span>Type</span>
+                            <span id="settingsType">-</span>
+                        </div>
+                        <div class="setting-item">
+                            <span>Office</span>
+                            <span id="settingsOffice">-</span>
+                        </div>
+                    </div>
+                    
+                    <button class="btn btn-danger" onclick="logout()" style="max-width:100%;">🚪 Logout</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="nav-bar">
+            <button class="nav-item active" onclick="showTab('clock')">
+                <span class="nav-icon">⏱️</span>
+                <span class="nav-label">Clock</span>
+            </button>
+            <button class="nav-item" onclick="showTab('history')">
+                <span class="nav-icon">📊</span>
+                <span class="nav-label">History</span>
+            </button>
+            <button class="nav-item" onclick="showTab('settings')">
+                <span class="nav-icon">⚙️</span>
+                <span class="nav-label">Settings</span>
+            </button>
+        </div>
+    </div>
+    
+    <!-- GREEN CARD MODAL -->
+    <div class="modal" id="greenCardModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="modal-title">📄 Green Card Data</span>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="green-card-output" id="greenCardOutput"></div>
+            <button class="btn btn-primary" onclick="copyGreenCard()" style="max-width:100%;">📋 Copy to Clipboard</button>
+        </div>
+    </div>
+    
+    <script>
+        const CODES_KEY = 'genesis_invite_codes';
+        const PROFILE_KEY = 'postal_profile';
+        const ROUTES_KEY = 'postal_routes';
+        const HISTORY_KEY = 'postal_history';
+        
+        let profile = null;
+        let todayRoutes = [];
+        let currentRoute = null;
+        let timerInterval = null;
+        let startTime = null;
+        let selectedActivity = 'casing';
+        let isOnLunch = false;
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            const savedProfile = localStorage.getItem(PROFILE_KEY);
+            const validatedCode = localStorage.getItem('postal_validated_code');
+            
+            if (validatedCode && savedProfile) {
+                profile = JSON.parse(savedProfile);
+                loadTodayRoutes();
+                showMainApp();
+            } else if (validatedCode) {
+                showScreen('setupScreen');
+            }
+            
+            // Activity buttons
+            document.querySelectorAll('.activity-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    document.querySelectorAll('.activity-btn').forEach(b => b.classList.remove('selected'));
+                    this.classList.add('selected');
+                    selectedActivity = this.dataset.activity;
+                });
+            });
+            
+            updateDate();
+        });
+        
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+        }
+        
+        function validateCode() {
+            const code = document.getElementById('inviteCode').value.trim().toUpperCase();
+            const errorEl = document.getElementById('codeError');
+            
+            if (!code) {
+                errorEl.textContent = '❌ Please enter an invite code';
+                errorEl.classList.add('show');
+                return;
+            }
+            
+            if (!code.startsWith('POSTAL-') || code.length !== 12) {
+                errorEl.textContent = '❌ Invalid format. Use: POSTAL-XXXXX';
+                errorEl.classList.add('show');
+                return;
+            }
+            
+            const codes = JSON.parse(localStorage.getItem(CODES_KEY) || '[]');
+            const codeObj = codes.find(c => c.code === code);
+            
+            if (!codeObj) {
+                errorEl.textContent = '❌ Code not found';
+                errorEl.classList.add('show');
+                return;
+            }
+            
+            if (codeObj.status === 'revoked') {
+                errorEl.textContent = '❌ This code has been revoked';
+                errorEl.classList.add('show');
+                return;
+            }
+            
+            if (codeObj.status === 'used') {
+                errorEl.textContent = '❌ This code has already been used';
+                errorEl.classList.add('show');
+                return;
+            }
+            
+            if (codeObj.appType !== 'postal') {
+                errorEl.textContent = '❌ Wrong app. This code is for: ' + codeObj.appType;
+                errorEl.classList.add('show');
+                return;
+            }
+            
+            localStorage.setItem('postal_validated_code', code);
+            errorEl.classList.remove('show');
+            showScreen('setupScreen');
+        }
+        
+        function updateCarrierOptions() {
+            const type = document.getElementById('employeeType').value;
+            const carrierGroup = document.getElementById('carrierTypeGroup');
+            if (type === 'carrier') {
+                carrierGroup.classList.remove('hidden');
+            } else {
+                carrierGroup.classList.add('hidden');
+            }
+        }
+        
+        function completeSetup() {
+            const name = document.getElementById('employeeName').value.trim();
+            const empType = document.getElementById('employeeType').value;
+            const carrierType = document.getElementById('carrierType').value;
+            const office = document.getElementById('officeLocation').value.trim();
+            
+            if (!name || !empType) {
+                alert('Please fill in all required fields');
+                return;
+            }
+            
+            profile = {
+                name: name,
+                employeeType: empType,
+                carrierType: empType === 'carrier' ? carrierType : null,
+                office: office || 'Not specified',
+                created: new Date().toISOString()
+            };
+            
+            localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+            
+            // Mark code as used
+            const code = localStorage.getItem('postal_validated_code');
+            const codes = JSON.parse(localStorage.getItem(CODES_KEY) || '[]');
+            const codeObj = codes.find(c => c.code === code);
+            if (codeObj) {
+                codeObj.status = 'used';
+                codeObj.usedBy = name;
+                codeObj.usedDate = new Date().toISOString();
+                localStorage.setItem(CODES_KEY, JSON.stringify(codes));
+            }
+            
+            loadTodayRoutes();
+            showMainApp();
+        }
+        
+        function showMainApp() {
+            showScreen('mainScreen');
+            
+            const typeLabel = profile.employeeType === 'carrier' ? 
+                (profile.carrierType || 'Carrier').toUpperCase() : 'Clerk';
+            document.getElementById('employeeBadge').textContent = `${typeLabel} - ${profile.name}`;
+            document.getElementById('settingsName').textContent = profile.name;
+            document.getElementById('settingsType').textContent = typeLabel;
+            document.getElementById('settingsOffice').textContent = profile.office;
+            
+            renderRoutes();
+            updateTotals();
+        }
+        
+        function updateDate() {
+            const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+            const now = new Date();
+            document.getElementById('dateDisplay').textContent = 
+                `${days[now.getDay()]}, ${months[now.getMonth()]} ${now.getDate()}, ${now.getFullYear()}`;
+        }
+        
+        function loadTodayRoutes() {
+            const today = new Date().toDateString();
+            const saved = JSON.parse(localStorage.getItem(ROUTES_KEY) || '{}');
+            todayRoutes = saved[today] || [];
+        }
+        
+        function saveTodayRoutes() {
+            const today = new Date().toDateString();
+            const saved = JSON.parse(localStorage.getItem(ROUTES_KEY) || '{}');
+            saved[today] = todayRoutes;
+            localStorage.setItem(ROUTES_KEY, JSON.stringify(saved));
+        }
+        
+        function clockIn() {
+            const routeNum = document.getElementById('routeNumber').value.trim() || 'Main Route';
+            
+            currentRoute = {
+                id: Date.now(),
+                route: routeNum,
+                activity: selectedActivity,
+                startTime: new Date().toISOString(),
+                endTime: null,
+                duration: 0,
+                isLunch: false
+            };
+            
+            startTime = new Date();
+            startTimer();
+            
+            document.getElementById('statusLabel').textContent = 'Working';
+            document.getElementById('currentRouteDisplay').textContent = `${routeNum} - ${selectedActivity}`;
+            document.getElementById('mainActions').classList.add('hidden');
+            document.getElementById('activeActions').classList.remove('hidden');
+            document.getElementById('routeInputGroup').classList.add('hidden');
+            document.getElementById('activityGrid').classList.add('hidden');
+        }
+        
+        function clockOut() {
+            if (!currentRoute) return;
+            
+            stopTimer();
+            
+            currentRoute.endTime = new Date().toISOString();
+            currentRoute.duration = Math.floor((new Date() - new Date(currentRoute.startTime)) / 1000);
+            todayRoutes.push(currentRoute);
+            saveTodayRoutes();
+            
+            currentRoute = null;
+            startTime = null;
+            
+            document.getElementById('statusLabel').textContent = 'Clocked Out';
+            document.getElementById('currentRouteDisplay').textContent = '';
+            document.getElementById('timerDisplay').textContent = '00:00:00';
+            document.getElementById('mainActions').classList.remove('hidden');
+            document.getElementById('activeActions').classList.add('hidden');
+            document.getElementById('routeInputGroup').classList.remove('hidden');
+            document.getElementById('activityGrid').classList.remove('hidden');
+            
+            renderRoutes();
+            updateTotals();
+        }
+        
+        function switchRoute() {
+            if (!currentRoute) return;
+            
+            // Save current route
+            stopTimer();
+            currentRoute.endTime = new Date().toISOString();
+            currentRoute.duration = Math.floor((new Date() - new Date(currentRoute.startTime)) / 1000);
+            todayRoutes.push(currentRoute);
+            saveTodayRoutes();
+            
+            // Show inputs for new route
+            document.getElementById('mainActions').classList.remove('hidden');
+            document.getElementById('activeActions').classList.add('hidden');
+            document.getElementById('routeInputGroup').classList.remove('hidden');
+            document.getElementById('activityGrid').classList.remove('hidden');
+            document.getElementById('statusLabel').textContent = 'Select New Route';
+            document.getElementById('currentRouteDisplay').textContent = '';
+            document.getElementById('timerDisplay').textContent = '00:00:00';
+            
+            currentRoute = null;
+            startTime = null;
+            
+            renderRoutes();
+            updateTotals();
+        }
+        
+        function startLunch() {
+            if (!currentRoute) return;
+            
+            // Save current work
+            stopTimer();
+            currentRoute.endTime = new Date().toISOString();
+            currentRoute.duration = Math.floor((new Date() - new Date(currentRoute.startTime)) / 1000);
+            todayRoutes.push(currentRoute);
+            
+            // Start lunch
+            currentRoute = {
+                id: Date.now(),
+                route: 'Lunch Break',
+                activity: 'lunch',
+                startTime: new Date().toISOString(),
+                endTime: null,
+                duration: 0,
+                isLunch: true
+            };
+            
+            startTime = new Date();
+            startTimer();
+            isOnLunch = true;
+            
+            document.getElementById('statusLabel').textContent = '🍔 On Lunch';
+            document.getElementById('currentRouteDisplay').textContent = 'Lunch Break (Unpaid)';
+            
+            saveTodayRoutes();
+            renderRoutes();
+        }
+        
+        function startTimer() {
+            timerInterval = setInterval(updateTimer, 1000);
+        }
+        
+        function stopTimer() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+        }
+        
+        function updateTimer() {
+            if (!startTime) return;
+            const elapsed = Math.floor((new Date() - startTime) / 1000);
+            document.getElementById('timerDisplay').textContent = formatTime(elapsed);
+        }
+        
+        function formatTime(seconds) {
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            const s = seconds % 60;
+            return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        }
+        
+        function formatTimeShort(seconds) {
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            return `${h}:${m.toString().padStart(2, '0')}`;
+        }
+        
+        function renderRoutes() {
+            const list = document.getElementById('routesList');
+            
+            if (todayRoutes.length === 0) {
+                list.innerHTML = '<div style="text-align:center; color:#666; padding:20px;">No routes yet today</div>';
+                return;
+            }
+            
+            list.innerHTML = todayRoutes.map(r => `
+                <div class="route-item">
+                    <div class="route-info">
+                        <div class="route-name">${r.isLunch ? '🍔' : '📬'} ${r.route}</div>
+                        <div class="route-activity">${r.activity}</div>
+                    </div>
+                    <div class="route-time">${formatTimeShort(r.duration)}</div>
+                </div>
+            `).join('');
+        }
+        
+        function updateTotals() {
+            let workTotal = 0;
+            let lunchTotal = 0;
+            
+            todayRoutes.forEach(r => {
+                if (r.isLunch) {
+                    lunchTotal += r.duration;
+                } else {
+                    workTotal += r.duration;
+                }
+            });
+            
+            document.getElementById('totalWork').textContent = formatTimeShort(workTotal);
+            document.getElementById('totalLunch').textContent = formatTimeShort(lunchTotal);
+        }
+        
+        function showGreenCard() {
+            let output = `GREEN CARD DATA - ${new Date().toLocaleDateString()}\n`;
+            output += `Employee: ${profile.name}\n`;
+            output += `Type: ${profile.carrierType || profile.employeeType}\n`;
+            output += `Office: ${profile.office}\n`;
+            output += `${'='.repeat(40)}\n\n`;
+            
+            let totalWork = 0;
+            let totalLunch = 0;
+            
+            todayRoutes.forEach(r => {
+                const start = new Date(r.startTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                const end = r.endTime ? new Date(r.endTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Active';
+                
+                output += `${r.route}\n`;
+                output += `  Activity: ${r.activity}\n`;
+                output += `  Time: ${start} - ${end}\n`;
+                output += `  Duration: ${formatTimeShort(r.duration)}\n\n`;
+                
+                if (r.isLunch) {
+                    totalLunch += r.duration;
+                } else {
+                    totalWork += r.duration;
+                }
+            });
+            
+            output += `${'='.repeat(40)}\n`;
+            output += `TOTAL WORK TIME: ${formatTimeShort(totalWork)}\n`;
+            output += `TOTAL LUNCH: ${formatTimeShort(totalLunch)}\n`;
+            output += `NET TIME: ${formatTimeShort(totalWork)}\n`;
+            
+            document.getElementById('greenCardOutput').textContent = output;
+            document.getElementById('greenCardModal').classList.add('show');
+        }
+        
+        function closeModal() {
+            document.getElementById('greenCardModal').classList.remove('show');
+        }
+        
+        function copyGreenCard() {
+            const output = document.getElementById('greenCardOutput').textContent;
+            navigator.clipboard.writeText(output).then(() => {
+                alert('✅ Copied to clipboard!');
+            });
+        }
+        
+        function showTab(tab) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            
+            document.getElementById(tab + 'Tab').classList.remove('hidden');
+            event.target.closest('.nav-item').classList.add('active');
+            
+            if (tab === 'history') {
+                renderHistory();
+            }
+        }
+        
+        function renderHistory() {
+            const saved = JSON.parse(localStorage.getItem(ROUTES_KEY) || '{}');
+            const list = document.getElementById('historyList');
+            
+            const dates = Object.keys(saved).sort().reverse();
+            
+            if (dates.length === 0) {
+                list.innerHTML = '<div style="text-align:center; color:#666; padding:30px;">No history yet</div>';
+                return;
+            }
+            
+            list.innerHTML = dates.map(date => {
+                const routes = saved[date];
+                const totalWork = routes.filter(r => !r.isLunch).reduce((sum, r) => sum + r.duration, 0);
+                const routeNames = [...new Set(routes.filter(r => !r.isLunch).map(r => r.route))].join(', ');
+                
+                return `
+                    <div class="history-item">
+                        <div class="history-date">${date}</div>
+                        <div class="history-routes">${routeNames || 'No routes'}</div>
+                        <div class="history-total">Total: ${formatTimeShort(totalWork)}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function logout() {
+            if (currentRoute) {
+                alert('Please clock out first');
+                return;
+            }
+            
+            if (confirm('Logout? Your data will be saved.')) {
+                localStorage.removeItem(PROFILE_KEY);
+                localStorage.removeItem('postal_validated_code');
+                location.reload();
+            }
+        }
+    </script>
+</body>
+</html>
