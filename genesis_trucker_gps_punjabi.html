@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>🚛 Genesis Trucker GPS</title>
+    <!-- Leaflet CSS for FREE maps -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        html, body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0a0a;
+            min-height: 100vh;
+            color: #fff;
+            overflow-x: hidden;
+        }
+        
+        .screen { display: none; min-height: 100vh; width: 100%; }
+        .screen.active { display: flex; flex-direction: column; }
+        
+        /* CODE SCREEN */
+        .code-screen {
+            justify-content: center;
+            align-items: center;
+            padding: 40px 20px;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        }
+        
+        .logo { font-size: 80px; margin-bottom: 20px; }
+        .title { font-size: 28px; font-weight: 700; margin-bottom: 10px; text-align: center; }
+        .subtitle { color: #aaa; margin-bottom: 10px; text-align: center; }
+        .subtitle-punjabi { color: #888; margin-bottom: 30px; text-align: center; font-size: 14px; }
+        
+        .code-input {
+            width: 100%;
+            max-width: 300px;
+            padding: 18px;
+            font-size: 20px;
+            text-align: center;
+            border: 3px solid #333;
+            border-radius: 15px;
+            background: #111;
+            color: #00ff88;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+        }
+        
+        .code-input:focus { outline: none; border-color: #00ff88; }
+        
+        .btn {
+            width: 100%;
+            max-width: 300px;
+            padding: 18px;
+            margin-top: 15px;
+            border: none;
+            border-radius: 15px;
+            font-size: 18px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        
+        .btn-primary { background: linear-gradient(135deg, #00b894 0%, #00cec9 100%); color: #000; }
+        .btn-danger { background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); color: #fff; }
+        
+        .error-msg { color: #ff6b6b; margin-top: 15px; text-align: center; display: none; }
+        .error-msg.show { display: block; }
+        
+        /* SETUP SCREEN */
+        .setup-screen {
+            padding: 30px 20px;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        }
+        
+        .setup-header { text-align: center; margin-bottom: 30px; }
+        
+        .form-card {
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 15px;
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        
+        .form-label { display: block; margin-bottom: 5px; font-weight: 600; color: #ccc; }
+        .form-label-punjabi { display: block; margin-bottom: 8px; font-size: 12px; color: #888; }
+        
+        .form-input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid rgba(255,255,255,0.2);
+            border-radius: 12px;
+            background: rgba(0,0,0,0.3);
+            color: #fff;
+            font-size: 16px;
+        }
+        
+        .form-input:focus { outline: none; border-color: #00ff88; }
+        
+        /* MAIN APP */
+        .main-screen { background: #0a0a0a; }
+        
+        .app-header {
+            background: linear-gradient(135deg, #e94560 0%, #ff6b6b 100%);
+            padding: 12px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .app-title { font-size: 16px; font-weight: 700; }
+        .driver-info { font-size: 11px; opacity: 0.9; }
+        
+        .header-btn {
+            background: rgba(0,0,0,0.2);
+            border: none;
+            padding: 8px 12px;
+            border-radius: 8px;
+            color: #fff;
+            cursor: pointer;
+        }
+        
+        /* NAV TABS */
+        .nav-tabs {
+            display: flex;
+            background: #111;
+            border-bottom: 2px solid #222;
+        }
+        
+        .nav-tab {
+            flex: 1;
+            padding: 12px 8px;
+            text-align: center;
+            background: none;
+            border: none;
+            color: #666;
+            font-size: 11px;
+            cursor: pointer;
+        }
+        
+        .nav-tab.active {
+            color: #00ff88;
+            background: rgba(0, 255, 136, 0.1);
+            border-bottom: 3px solid #00ff88;
+        }
+        
+        .nav-tab-icon { font-size: 18px; display: block; margin-bottom: 3px; }
+        
+        .tab-content { display: none; padding: 15px; padding-bottom: 30px; }
+        .tab-content.active { display: block; }
+        
+        /* MAP */
+        #map {
+            height: 280px;
+            border-radius: 15px;
+            margin-bottom: 15px;
+            background: #1a1a2e;
+        }
+        
+        .location-card {
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 15px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        
+        .location-status { font-size: 14px; color: #00ff88; margin-bottom: 5px; }
+        .location-coords { font-size: 12px; color: #888; }
+        
+        /* DESTINATION INPUT */
+        .dest-card {
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .dest-label { font-size: 14px; font-weight: 600; margin-bottom: 5px; }
+        .dest-label-punjabi { font-size: 12px; color: #888; margin-bottom: 10px; }
+        
+        .dest-input {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            background: rgba(0,0,0,0.3);
+            color: #fff;
+            font-size: 16px;
+        }
+        
+        .nav-btn {
+            width: 100%;
+            padding: 18px;
+            background: linear-gradient(135deg, #00b894 0%, #00cec9 100%);
+            border: none;
+            border-radius: 15px;
+            color: #000;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            margin-bottom: 15px;
+        }
+        
+        /* QUICK LINKS */
+        .section-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin: 20px 0 10px 0;
+            color: #ccc;
+        }
+        
+        .quick-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+        
+        .quick-btn {
+            background: rgba(255,255,255,0.1);
+            border: none;
+            border-radius: 12px;
+            padding: 15px 8px;
+            text-align: center;
+            cursor: pointer;
+            color: #fff;
+        }
+        
+        .quick-btn.highlight {
+            background: linear-gradient(135deg, #ff9f43 0%, #ee5a24 100%);
+        }
+        
+        .quick-icon { font-size: 24px; display: block; margin-bottom: 5px; }
+        .quick-text { font-size: 10px; color: #ccc; display: block; }
+        .quick-punjabi { font-size: 9px; color: #666; display: block; }
+        
+        .quick-btn.highlight .quick-text,
+        .quick-btn.highlight .quick-punjabi { color: #fff; }
+        
+        /* SCANNER TAB */
+        .scanner-card {
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 25px;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        
+        .scanner-icon { font-size: 50px; margin-bottom: 15px; }
+        
+        .scan-btn {
+            width: 100%;
+            padding: 18px;
+            background: linear-gradient(135deg, #0984e3 0%, #74b9ff 100%);
+            border: none;
+            border-radius: 12px;
+            color: #fff;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 10px;
+        }
+        
+        .scan-text { color: #aaa; font-size: 13px; }
+        .scan-punjabi { color: #666; font-size: 12px; margin-top: 5px; }
+        
+        .doc-item {
+            background: rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .doc-thumb { font-size: 28px; }
+        .doc-info { flex: 1; }
+        .doc-name { font-weight: 600; font-size: 13px; }
+        .doc-date { color: #666; font-size: 11px; }
+        
+        .doc-actions { display: flex; gap: 6px; }
+        .doc-btn {
+            padding: 6px 10px;
+            border: none;
+            border-radius: 6px;
+            font-size: 11px;
+            cursor: pointer;
+        }
+        .btn-share { background: #00b894; color: #fff; }
+        .btn-delete { background: #e74c3c; color: #fff; }
+        
+        /* SETTINGS TAB */
+        .settings-section {
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .settings-title { font-weight: 600; margin-bottom: 15px; font-size: 14px; }
+        
+        .setting-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            font-size: 13px;
+        }
+        
+        .setting-item:last-child { border-bottom: none; }
+        .setting-value { color: #00ff88; font-size: 12px; }
+        
+        #cameraInput { display: none; }
+    </style>
+</head>
+<body>
+    <!-- SCREEN 1: CODE ENTRY -->
+    <div id="codeScreen" class="screen active code-screen">
+        <div class="logo">🚛</div>
+        <div class="title">Genesis Trucker GPS</div>
+        <div class="subtitle">Truck-friendly navigation</div>
+        <div class="subtitle-punjabi">ਟਰੱਕਰਾਂ ਲਈ GPS ਐਪ</div>
+        
+        <input type="text" class="code-input" id="inviteCode" placeholder="Enter code">
+        <button class="btn btn-primary" onclick="validateCode()">🔓 Enter / ਐਪ ਖੋਲ੍ਹੋ</button>
+        <div class="error-msg" id="codeError">❌ Invalid code</div>
+    </div>
+    
+    <!-- SCREEN 2: DRIVER SETUP -->
+    <div id="setupScreen" class="screen setup-screen">
+        <div class="setup-header">
+            <div style="font-size:60px; margin-bottom:15px;">🚛</div>
+            <h2>Driver Setup</h2>
+            <p style="color:#888; margin-top:5px;">ਡਰਾਈਵਰ ਸੈੱਟਅੱਪ</p>
+        </div>
+        
+        <div class="form-card">
+            <label class="form-label">Your Name</label>
+            <label class="form-label-punjabi">ਤੁਹਾਡਾ ਨਾਮ</label>
+            <input type="text" class="form-input" id="driverName" placeholder="e.g., Harpreet Singh">
+        </div>
+        
+        <div class="form-card">
+            <label class="form-label">Truck Number</label>
+            <label class="form-label-punjabi">ਟਰੱਕ ਨੰਬਰ</label>
+            <input type="text" class="form-input" id="truckNumber" placeholder="e.g., TX-12345">
+        </div>
+        
+        <div class="form-card">
+            <label class="form-label">Company Name</label>
+            <label class="form-label-punjabi">ਕੰਪਨੀ ਦਾ ਨਾਮ</label>
+            <input type="text" class="form-input" id="companyName" placeholder="e.g., Singh Transport LLC">
+        </div>
+        
+        <div style="max-width:500px; margin:0 auto;">
+            <button class="btn btn-primary" onclick="completeSetup()" style="max-width:100%;">✅ Start / ਸ਼ੁਰੂ ਕਰੋ</button>
+        </div>
+    </div>
+    
+    <!-- SCREEN 3: MAIN APP -->
+    <div id="mainScreen" class="screen main-screen">
+        <div class="app-header">
+            <div>
+                <div class="app-title">🚛 Genesis Trucker GPS</div>
+                <div class="driver-info" id="driverDisplay">Driver Name • Truck #</div>
+            </div>
+            <button class="header-btn" onclick="showTab('settings')">⚙️</button>
+        </div>
+        
+        <div class="nav-tabs">
+            <button class="nav-tab active" onclick="showTab('map')">
+                <span class="nav-tab-icon">🗺️</span>
+                Map / ਨਕਸ਼ਾ
+            </button>
+            <button class="nav-tab" onclick="showTab('scanner')">
+                <span class="nav-tab-icon">📸</span>
+                Scan / ਸਕੈਨ
+            </button>
+            <button class="nav-tab" onclick="showTab('settings')">
+                <span class="nav-tab-icon">⚙️</span>
+                Settings
+            </button>
+        </div>
+        
+        <!-- MAP TAB -->
+        <div id="mapTab" class="tab-content active">
+            <div id="map"></div>
+            
+            <div class="location-card">
+                <div class="location-status" id="locationStatus">📍 Getting location... / ਸਥਾਨ ਲੱਭ ਰਿਹਾ ਹੈ...</div>
+                <div class="location-coords" id="locationCoords"></div>
+            </div>
+            
+            <div class="dest-card">
+                <div class="dest-label">🎯 Destination / ਮੰਜ਼ਿਲ</div>
+                <div class="dest-label-punjabi">ਕਿੱਥੇ ਜਾਣਾ ਹੈ?</div>
+                <input type="text" class="dest-input" id="destinationInput" placeholder="Enter address / ਪਤਾ ਦਿਓ">
+            </div>
+            
+            <button class="nav-btn" onclick="startNavigation()">
+                🚀 Start Navigation / ਨੈਵੀਗੇਸ਼ਨ ਸ਼ੁਰੂ ਕਰੋ
+            </button>
+            
+            <div class="section-title">🍽️ Food / ਖਾਣਾ</div>
+            <div class="quick-grid">
+                <button class="quick-btn highlight" onclick="findNearby('indian restaurant')">
+                    <span class="quick-icon">🍛</span>
+                    <span class="quick-text">Indian Food</span>
+                    <span class="quick-punjabi">ਭਾਰਤੀ ਖਾਣਾ</span>
+                </button>
+                <button class="quick-btn highlight" onclick="findNearby('punjabi dhaba')">
+                    <span class="quick-icon">🥘</span>
+                    <span class="quick-text">Punjabi Dhaba</span>
+                    <span class="quick-punjabi">ਪੰਜਾਬੀ ਢਾਬਾ</span>
+                </button>
+                <button class="quick-btn" onclick="findNearby('restaurant')">
+                    <span class="quick-icon">🍔</span>
+                    <span class="quick-text">Any Food</span>
+                    <span class="quick-punjabi">ਕੋਈ ਵੀ ਖਾਣਾ</span>
+                </button>
+            </div>
+            
+            <div class="section-title">🚛 Trucker Stops / ਟਰੱਕ ਸਟਾਪ</div>
+            <div class="quick-grid">
+                <button class="quick-btn" onclick="findNearby('truck stop')">
+                    <span class="quick-icon">⛽</span>
+                    <span class="quick-text">Truck Stops</span>
+                    <span class="quick-punjabi">ਟਰੱਕ ਸਟਾਪ</span>
+                </button>
+                <button class="quick-btn" onclick="findNearby('truck parking')">
+                    <span class="quick-icon">🅿️</span>
+                    <span class="quick-text">Parking</span>
+                    <span class="quick-punjabi">ਪਾਰਕਿੰਗ</span>
+                </button>
+                <button class="quick-btn" onclick="findNearby('rest area')">
+                    <span class="quick-icon">🛏️</span>
+                    <span class="quick-text">Rest Areas</span>
+                    <span class="quick-punjabi">ਆਰਾਮ ਖੇਤਰ</span>
+                </button>
+                <button class="quick-btn" onclick="findNearby('diesel gas station')">
+                    <span class="quick-icon">🛢️</span>
+                    <span class="quick-text">Diesel</span>
+                    <span class="quick-punjabi">ਡੀਜ਼ਲ</span>
+                </button>
+                <button class="quick-btn" onclick="findNearby('truck wash')">
+                    <span class="quick-icon">🚿</span>
+                    <span class="quick-text">Truck Wash</span>
+                    <span class="quick-punjabi">ਟਰੱਕ ਧੋਣਾ</span>
+                </button>
+                <button class="quick-btn" onclick="findNearby('truck repair')">
+                    <span class="quick-icon">🔧</span>
+                    <span class="quick-text">Repair</span>
+                    <span class="quick-punjabi">ਮੁਰੰਮਤ</span>
+                </button>
+            </div>
+        </div>
+        
+        <!-- SCANNER TAB -->
+        <div id="scannerTab" class="tab-content">
+            <div class="scanner-card">
+                <div class="scanner-icon">📄</div>
+                <button class="scan-btn" onclick="scanDocument()">
+                    📸 Scan Document / ਡਾਕੂਮੈਂਟ ਸਕੈਨ ਕਰੋ
+                </button>
+                <div class="scan-text">Take photo of load documents</div>
+                <div class="scan-punjabi">ਲੋਡ ਡਾਕੂਮੈਂਟਸ ਦੀ ਫੋਟੋ ਲਓ</div>
+            </div>
+            
+            <input type="file" id="cameraInput" accept="image/*" capture="environment" onchange="processImage(event)">
+            
+            <h3 style="margin:20px 0 15px; font-size:14px;">📁 Saved Documents / ਸੇਵ ਕੀਤੇ ਡਾਕੂਮੈਂਟ</h3>
+            <div id="docList"></div>
+        </div>
+        
+        <!-- SETTINGS TAB -->
+        <div id="settingsTab" class="tab-content">
+            <div class="settings-section">
+                <div class="settings-title">🚛 Driver Info / ਡਰਾਈਵਰ ਜਾਣਕਾਰੀ</div>
+                <div class="setting-item">
+                    <span>Name / ਨਾਮ</span>
+                    <span class="setting-value" id="settingsName">-</span>
+                </div>
+                <div class="setting-item">
+                    <span>Truck / ਟਰੱਕ</span>
+                    <span class="setting-value" id="settingsTruck">-</span>
+                </div>
+                <div class="setting-item">
+                    <span>Company / ਕੰਪਨੀ</span>
+                    <span class="setting-value" id="settingsCompany">-</span>
+                </div>
+            </div>
+            
+            <div class="settings-section">
+                <div class="settings-title">📍 GPS Status</div>
+                <div class="setting-item">
+                    <span>Location</span>
+                    <span class="setting-value" id="settingsGps">-</span>
+                </div>
+            </div>
+            
+            <button class="btn btn-danger" onclick="logout()" style="max-width:100%;">
+                🚪 Logout / ਲੌਗਆਊਟ
+            </button>
+        </div>
+    </div>
+    
+    <!-- Leaflet JS for FREE maps -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <script>
+        const CODES_KEY = 'genesis_invite_codes';
+        const PROFILE_KEY = 'trucker_profile';
+        const DOCS_KEY = 'trucker_docs';
+        
+        let profile = null;
+        let documents = JSON.parse(localStorage.getItem(DOCS_KEY) || '[]');
+        let map = null;
+        let userMarker = null;
+        let userLat = null;
+        let userLon = null;
+        let watchId = null;
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            const savedProfile = localStorage.getItem(PROFILE_KEY);
+            const validatedCode = localStorage.getItem('trucker_validated_code');
+            
+            if (validatedCode && savedProfile) {
+                profile = JSON.parse(savedProfile);
+                showMainApp();
+            } else if (validatedCode) {
+                showScreen('setupScreen');
+            }
+            
+            renderDocuments();
+        });
+        
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+            window.scrollTo(0, 0);
+        }
+        
+        function validateCode() {
+            let code = document.getElementById('inviteCode').value.trim().toUpperCase();
+            const errorEl = document.getElementById('codeError');
+            
+            if (!code.startsWith('TRUCK-')) {
+                code = 'TRUCK-' + code;
+            }
+            
+            if (!code || code.length < 9) {
+                errorEl.textContent = '❌ Please enter code / ਕੋਡ ਦਿਓ';
+                errorEl.classList.add('show');
+                return;
+            }
+            
+            if (code.startsWith('TRUCK-') && code.length >= 11) {
+                localStorage.setItem('trucker_validated_code', code);
+                errorEl.classList.remove('show');
+                showScreen('setupScreen');
+                return;
+            }
+            
+            errorEl.textContent = '❌ Invalid code format';
+            errorEl.classList.add('show');
+        }
+        
+        function completeSetup() {
+            const name = document.getElementById('driverName').value.trim();
+            const truck = document.getElementById('truckNumber').value.trim();
+            const company = document.getElementById('companyName').value.trim();
+            
+            if (!name) {
+                alert('Please enter your name / ਆਪਣਾ ਨਾਮ ਦਿਓ');
+                return;
+            }
+            
+            profile = {
+                name: name,
+                truck: truck || 'Not set',
+                company: company || 'Not set',
+                created: new Date().toISOString()
+            };
+            
+            localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+            
+            // Mark code as used
+            const code = localStorage.getItem('trucker_validated_code');
+            const codes = JSON.parse(localStorage.getItem(CODES_KEY) || '[]');
+            const codeObj = codes.find(c => c.code === code);
+            if (codeObj) {
+                codeObj.status = 'used';
+                codeObj.usedBy = name;
+                codeObj.usedDate = new Date().toISOString();
+                localStorage.setItem(CODES_KEY, JSON.stringify(codes));
+            }
+            
+            showMainApp();
+        }
+        
+        function showMainApp() {
+            showScreen('mainScreen');
+            
+            document.getElementById('driverDisplay').textContent = `${profile.name} • ${profile.truck}`;
+            document.getElementById('settingsName').textContent = profile.name;
+            document.getElementById('settingsTruck').textContent = profile.truck;
+            document.getElementById('settingsCompany').textContent = profile.company;
+            
+            setTimeout(initMap, 100);
+            startGPS();
+        }
+        
+        function initMap() {
+            // Default to center of US
+            map = L.map('map').setView([39.8283, -98.5795], 4);
+            
+            // Add OpenStreetMap tiles (FREE!)
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '© OpenStreetMap'
+            }).addTo(map);
+            
+            // Truck icon
+            const truckIcon = L.divIcon({
+                html: '🚛',
+                className: 'truck-marker',
+                iconSize: [30, 30],
+                iconAnchor: [15, 15]
+            });
+            
+            userMarker = L.marker([39.8283, -98.5795], { icon: truckIcon }).addTo(map);
+        }
+        
+        function startGPS() {
+            if (!navigator.geolocation) {
+                document.getElementById('locationStatus').textContent = '❌ GPS not available';
+                document.getElementById('settingsGps').textContent = 'Not available';
+                return;
+            }
+            
+            watchId = navigator.geolocation.watchPosition(
+                updateLocation,
+                handleGPSError,
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
+            );
+        }
+        
+        function updateLocation(position) {
+            userLat = position.coords.latitude;
+            userLon = position.coords.longitude;
+            
+            document.getElementById('locationStatus').textContent = '📍 Location found! / ਸਥਾਨ ਮਿਲ ਗਿਆ!';
+            document.getElementById('locationCoords').textContent = `${userLat.toFixed(4)}, ${userLon.toFixed(4)}`;
+            document.getElementById('settingsGps').textContent = 'Active ✓';
+            
+            if (map && userMarker) {
+                userMarker.setLatLng([userLat, userLon]);
+                map.setView([userLat, userLon], 13);
+            }
+        }
+        
+        function handleGPSError(error) {
+            document.getElementById('locationStatus').textContent = '⚠️ GPS error - enable location';
+            document.getElementById('settingsGps').textContent = error.message;
+        }
+        
+        function startNavigation() {
+            const dest = document.getElementById('destinationInput').value.trim();
+            if (!dest) {
+                alert('Enter destination / ਮੰਜ਼ਿਲ ਦਿਓ');
+                return;
+            }
+            
+            let url;
+            if (userLat && userLon) {
+                url = `https://www.google.com/maps/dir/${userLat},${userLon}/${encodeURIComponent(dest)}`;
+            } else {
+                url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(dest)}&travelmode=driving`;
+            }
+            
+            window.open(url, '_blank');
+            speak('Navigation started! ਨੈਵੀਗੇਸ਼ਨ ਸ਼ੁਰੂ!');
+        }
+        
+        function findNearby(type) {
+            let url;
+            if (userLat && userLon) {
+                url = `https://www.google.com/maps/search/${encodeURIComponent(type)}/@${userLat},${userLon},12z`;
+            } else {
+                url = `https://www.google.com/maps/search/${encodeURIComponent(type)}`;
+            }
+            window.open(url, '_blank');
+        }
+        
+        function speak(text) {
+            if ('speechSynthesis' in window) {
+                const utterance = new SpeechSynthesisUtterance(text);
+                speechSynthesis.speak(utterance);
+            }
+        }
+        
+        function scanDocument() {
+            document.getElementById('cameraInput').click();
+        }
+        
+        function processImage(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const doc = {
+                    id: Date.now(),
+                    name: 'Load Doc ' + (documents.length + 1),
+                    data: e.target.result,
+                    date: new Date().toISOString()
+                };
+                
+                documents.push(doc);
+                localStorage.setItem(DOCS_KEY, JSON.stringify(documents));
+                renderDocuments();
+                
+                alert('✅ Document saved! / ਡਾਕੂਮੈਂਟ ਸੇਵ ਹੋ ਗਿਆ!');
+            };
+            reader.readAsDataURL(file);
+        }
+        
+        function renderDocuments() {
+            const list = document.getElementById('docList');
+            
+            if (documents.length === 0) {
+                list.innerHTML = '<div style="text-align:center; color:#666; padding:20px;">No documents / ਕੋਈ ਡਾਕੂਮੈਂਟ ਨਹੀਂ</div>';
+                return;
+            }
+            
+            list.innerHTML = documents.map(doc => {
+                const date = new Date(doc.date).toLocaleDateString();
+                return `
+                    <div class="doc-item">
+                        <div class="doc-thumb">📄</div>
+                        <div class="doc-info">
+                            <div class="doc-name">${doc.name}</div>
+                            <div class="doc-date">${date}</div>
+                        </div>
+                        <div class="doc-actions">
+                            <button class="doc-btn btn-share" onclick="shareDoc(${doc.id})">📤</button>
+                            <button class="doc-btn btn-delete" onclick="deleteDoc(${doc.id})">🗑️</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function shareDoc(id) {
+            const doc = documents.find(d => d.id === id);
+            if (!doc) return;
+            
+            if (navigator.share) {
+                fetch(doc.data)
+                    .then(res => res.blob())
+                    .then(blob => {
+                        const file = new File([blob], doc.name + '.jpg', { type: 'image/jpeg' });
+                        navigator.share({ title: doc.name, files: [file] }).catch(() => {
+                            navigator.share({ title: doc.name, text: 'Load document' });
+                        });
+                    });
+            } else {
+                alert('Share not available');
+            }
+        }
+        
+        function deleteDoc(id) {
+            if (confirm('Delete? / ਮਿਟਾਓ?')) {
+                documents = documents.filter(d => d.id !== id);
+                localStorage.setItem(DOCS_KEY, JSON.stringify(documents));
+                renderDocuments();
+            }
+        }
+        
+        function showTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+            
+            document.getElementById(tabName + 'Tab').classList.add('active');
+            
+            document.querySelectorAll('.nav-tab').forEach(t => {
+                if (t.textContent.toLowerCase().includes(tabName.substring(0,3))) {
+                    t.classList.add('active');
+                }
+            });
+            
+            if (tabName === 'map' && map) {
+                setTimeout(() => map.invalidateSize(), 100);
+            }
+        }
+        
+        function logout() {
+            if (confirm('Logout? / ਲੌਗਆਊਟ?')) {
+                if (watchId) navigator.geolocation.clearWatch(watchId);
+                localStorage.removeItem(PROFILE_KEY);
+                localStorage.removeItem('trucker_validated_code');
+                location.reload();
+            }
+        }
+    </script>
+</body>
+</html>
