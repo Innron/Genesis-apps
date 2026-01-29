@@ -2071,6 +2071,11 @@
         
         if (panel === 'history') renderHistory();
         if (panel === 'routes') clearRouteSearch();
+        if (panel === 'packages') {
+            // Reload packages from storage in case it was updated
+            scannedPackages = JSON.parse(localStorage.getItem(PKG_STORE_KEY) || '[]');
+            renderScannedPackages();
+        }
     }
     
     function closePanel() {
@@ -2138,18 +2143,27 @@
             pendingImageData = imageData;
             pendingPackageId = Date.now();
             
-            // Try to extract addresses using OCR
-            const addresses = await extractAddressesFromImage(imageData);
-            
-            if (addresses.length === 0) {
-                // No addresses found - prompt manual entry
-                manualAddressEntry();
-            } else if (addresses.length === 1) {
-                // One address found - use it
-                addPackageWithAddress(addresses[0]);
-            } else {
-                // Multiple addresses found - let user pick
-                showAddressSelection(addresses);
+            try {
+                // Try to extract addresses using OCR
+                const addresses = await extractAddressesFromImage(imageData);
+                
+                console.log('Addresses found:', addresses);
+                
+                if (addresses.length === 0) {
+                    // No addresses found - prompt manual entry
+                    showToast('No address found. Enter manually.');
+                    setTimeout(() => manualAddressEntry(), 500);
+                } else if (addresses.length === 1) {
+                    // One address found - use it
+                    addPackageWithAddress(addresses[0]);
+                } else {
+                    // Multiple addresses found - let user pick
+                    showAddressSelection(addresses);
+                }
+            } catch (err) {
+                console.error('Scan error:', err);
+                showToast('Scan error. Enter manually.');
+                setTimeout(() => manualAddressEntry(), 500);
             }
         };
         reader.readAsDataURL(file);
@@ -2173,6 +2187,8 @@
             
             const text = result.data.text;
             console.log('OCR Result:', text);
+            
+            showToast('Processing text...');
             
             // Extract addresses from the text
             const addresses = parseAddressesFromText(text);
