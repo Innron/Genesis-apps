@@ -280,7 +280,14 @@
         </div>
         <div class="panel-content">
             <div class="setting-group">
-                <div class="setting-group-title">Current Pay Period</div>
+                <div class="setting-group-title">💵 Hourly Rate</div>
+                <div class="setting-item">
+                    <span class="setting-label">Your Hourly Rate</span>
+                    <input type="number" class="setting-select" id="payHourlyRate" value="20" style="width:80px;" onchange="savePaySettings()">
+                </div>
+            </div>
+            <div class="setting-group">
+                <div class="setting-group-title">⏱️ Current Pay Period</div>
                 <div class="setting-item">
                     <span class="setting-label">Hours This Period</span>
                     <span class="setting-value" id="payPeriodHours">0.0</span>
@@ -291,7 +298,15 @@
                 </div>
             </div>
             <div class="setting-group">
-                <div class="setting-group-title">Enter Paycheck</div>
+                <div class="setting-group-title">📝 Enter Previous Hours</div>
+                <div style="padding:15px;">
+                    <input type="number" class="modal-input" id="prevHours" placeholder="Previous Period Hours">
+                    <input type="date" class="modal-input" id="prevDate" style="color:#fff;">
+                    <button class="clock-btn" style="width:100%;margin-top:10px;background:#636e72;" onclick="addPreviousHours()">Add to History</button>
+                </div>
+            </div>
+            <div class="setting-group">
+                <div class="setting-group-title">🧾 Enter Paycheck</div>
                 <div style="padding:15px;">
                     <input type="number" class="modal-input" id="grossPay" placeholder="Gross Pay ($)">
                     <input type="number" class="modal-input" id="netPay" placeholder="Net Pay ($)">
@@ -299,8 +314,19 @@
                     <button class="clock-btn clock-btn-in" style="width:100%;margin-top:10px;" onclick="calculatePay()">Calculate</button>
                 </div>
             </div>
+            <div class="setting-group">
+                <div class="setting-group-title">➕ Custom Deductions</div>
+                <div style="padding:15px;">
+                    <div id="customDeductionsList"></div>
+                    <div style="display:flex;gap:10px;margin-top:10px;">
+                        <input type="text" class="modal-input" id="deductionName" placeholder="Name (e.g. TSP, Insurance)" style="flex:1;margin:0;">
+                        <input type="number" class="modal-input" id="deductionAmount" placeholder="$" style="width:80px;margin:0;">
+                    </div>
+                    <button class="clock-btn" style="width:100%;margin-top:10px;background:#636e72;" onclick="addDeduction()">Add Deduction</button>
+                </div>
+            </div>
             <div class="setting-group" id="payBreakdown" style="display:none;">
-                <div class="setting-group-title">Breakdown</div>
+                <div class="setting-group-title">📊 Breakdown</div>
                 <div id="payBreakdownList"></div>
             </div>
         </div>
@@ -388,9 +414,6 @@
                 </div>
                 <div class="help-item" onclick="showHelpTopic('tasks')">
                     <div class="help-item-title"><span class="help-item-icon">📋</span> Task Tracking</div>
-                </div>
-                <div class="help-item" onclick="showHelpTopic('routes')">
-                    <div class="help-item-title"><span class="help-item-icon">🔍</span> Route Lookup</div>
                 </div>
                 <div class="help-item" onclick="showHelpTopic('greencard')">
                     <div class="help-item-title"><span class="help-item-icon">📸</span> Green Card Photo</div>
@@ -517,6 +540,7 @@
         greenCardImages: [], // New: array of images
         gpsArrival: null,
         customEntries: [],
+        customDeductions: [],
         settings: {
             geofenceEnabled: 'on',
             geofenceRadius: '200',
@@ -645,6 +669,8 @@
         renderTaskBreakdown();
         renderEntries();
         renderGreenCardImages();
+        renderCustomDeductions();
+        updatePayEstimate();
     }
     
     function renderTasks() {
@@ -1586,6 +1612,112 @@
     }
     
     // ==================== PAY ====================
+    function savePaySettings() {
+        state.settings.hourlyRate = parseFloat(document.getElementById('payHourlyRate').value) || 20;
+        saveState();
+        updatePayEstimate();
+        showToast('Hourly rate saved');
+    }
+    
+    function updatePayEstimate() {
+        // Calculate hours from history in current pay period (last 2 weeks)
+        const twoWeeksAgo = Date.now() - (14 * 24 * 60 * 60 * 1000);
+        let totalMs = 0;
+        
+        state.history.forEach(h => {
+            if (h.clockIn > twoWeeksAgo) {
+                totalMs += h.totalTime || 0;
+            }
+        });
+        
+        const hours = totalMs / (1000 * 60 * 60);
+        const rate = state.settings.hourlyRate || 20;
+        const estimate = hours * rate;
+        
+        document.getElementById('payPeriodHours').textContent = hours.toFixed(1);
+        document.getElementById('payEstimate').textContent = '$' + estimate.toFixed(2);
+        document.getElementById('payHourlyRate').value = rate;
+    }
+    
+    function addPreviousHours() {
+        const hours = parseFloat(document.getElementById('prevHours').value);
+        const date = document.getElementById('prevDate').value;
+        
+        if (!hours || !date) {
+            showToast('Enter hours and date');
+            return;
+        }
+        
+        const dateObj = new Date(date);
+        const totalMs = hours * 60 * 60 * 1000;
+        
+        // Add to history
+        state.history.push({
+            date: dateObj.toDateString(),
+            clockIn: dateObj.getTime(),
+            clockOut: dateObj.getTime() + totalMs,
+            totalTime: totalMs,
+            entries: [],
+            taskTimes: {},
+            office: state.office,
+            position: state.position,
+            manualEntry: true
+        });
+        
+        saveState();
+        document.getElementById('prevHours').value = '';
+        document.getElementById('prevDate').value = '';
+        updatePayEstimate();
+        showToast('Added ' + hours + ' hours for ' + dateObj.toLocaleDateString());
+    }
+    
+    function addDeduction() {
+        const name = document.getElementById('deductionName').value.trim();
+        const amount = parseFloat(document.getElementById('deductionAmount').value) || 0;
+        
+        if (!name || amount <= 0) {
+            showToast('Enter name and amount');
+            return;
+        }
+        
+        if (!state.customDeductions) {
+            state.customDeductions = [];
+        }
+        
+        state.customDeductions.push({ name, amount });
+        saveState();
+        
+        document.getElementById('deductionName').value = '';
+        document.getElementById('deductionAmount').value = '';
+        
+        renderCustomDeductions();
+        showToast('Deduction added: ' + name);
+    }
+    
+    function renderCustomDeductions() {
+        const list = document.getElementById('customDeductionsList');
+        if (!state.customDeductions || state.customDeductions.length === 0) {
+            list.innerHTML = '<div style="color:#888;font-size:12px;text-align:center;">No custom deductions</div>';
+            return;
+        }
+        
+        list.innerHTML = state.customDeductions.map((d, i) => `
+            <div class="setting-item" style="padding:8px 0;">
+                <span>${d.name}</span>
+                <span style="display:flex;align-items:center;gap:10px;">
+                    <span style="color:#e74c3c;">-$${d.amount.toFixed(2)}</span>
+                    <button onclick="removeDeduction(${i})" style="background:none;border:none;color:#888;font-size:14px;">✕</button>
+                </span>
+            </div>
+        `).join('');
+    }
+    
+    function removeDeduction(index) {
+        state.customDeductions.splice(index, 1);
+        saveState();
+        renderCustomDeductions();
+    }
+    
     function calculatePay() {
         const gross = parseFloat(document.getElementById('grossPay').value) || 0;
         const net = parseFloat(document.getElementById('netPay').value) || 0;
@@ -1601,8 +1733,19 @@
         const stateTax = gross * 0; // Texas has no state tax
         const socialSecurity = gross * 0.062;
         const medicare = gross * 0.0145;
+        
+        // Calculate custom deductions
+        let customTotal = 0;
+        let customHtml = '';
+        if (state.customDeductions && state.customDeductions.length > 0) {
+            state.customDeductions.forEach(d => {
+                customTotal += d.amount;
+                customHtml += `<div class="setting-item"><span>${d.name}</span><span style="color:#e74c3c;">-$${d.amount.toFixed(2)}</span></div>`;
+            });
+        }
+        
         const totalTax = fedTax + stateTax + socialSecurity + medicare;
-        const calculated = gross - totalTax;
+        const calculated = gross - totalTax - customTotal;
         
         document.getElementById('payBreakdown').style.display = 'block';
         document.getElementById('payBreakdownList').innerHTML = `
@@ -1611,6 +1754,7 @@
             <div class="setting-item"><span>Social Security (6.2%)</span><span style="color:#e74c3c;">-$${socialSecurity.toFixed(2)}</span></div>
             <div class="setting-item"><span>Medicare (1.45%)</span><span style="color:#e74c3c;">-$${medicare.toFixed(2)}</span></div>
             <div class="setting-item"><span>State Tax</span><span style="color:#888;">$0 (TX)</span></div>
+            ${customHtml}
             <div class="setting-item" style="border-top:2px solid #00b894;margin-top:10px;padding-top:15px;">
                 <span><strong>Calculated Net</strong></span>
                 <span class="setting-value"><strong>$${calculated.toFixed(2)}</strong></span>
@@ -1621,8 +1765,8 @@
                 <span class="setting-value">$${net.toFixed(2)}</span>
             </div>
             <div class="setting-item">
-                <span>Other Deductions</span>
-                <span style="color:#e74c3c;">$${(calculated - net).toFixed(2)}</span>
+                <span>Difference</span>
+                <span style="color:${(calculated - net) > 0 ? '#e74c3c' : '#00b894'};">$${Math.abs(calculated - net).toFixed(2)}</span>
             </div>
             ` : ''}
         `;
