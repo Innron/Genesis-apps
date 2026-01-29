@@ -879,7 +879,46 @@
         
         // Load voices
         if ('speechSynthesis' in window) { speechSynthesis.getVoices(); speechSynthesis.onvoiceschanged = () => speechSynthesis.getVoices(); }
+        
+        // Setup swipe gestures for route card directions panel
+        setupRouteCardSwipeGestures();
     });
+    
+    function setupRouteCardSwipeGestures() {
+        const routeCard = document.getElementById('routeCard');
+        if (!routeCard) return;
+        
+        let touchStartY = 0;
+        let touchStartX = 0;
+        
+        routeCard.addEventListener('touchstart', (e) => {
+            touchStartY = e.touches[0].clientY;
+            touchStartX = e.touches[0].clientX;
+        }, { passive: true });
+        
+        routeCard.addEventListener('touchend', (e) => {
+            const touchEndY = e.changedTouches[0].clientY;
+            const touchEndX = e.changedTouches[0].clientX;
+            const diffY = touchStartY - touchEndY;
+            const diffX = Math.abs(touchStartX - touchEndX);
+            
+            // Only trigger if vertical swipe (not horizontal scroll)
+            if (Math.abs(diffY) > 50 && diffX < 50) {
+                const container = document.getElementById('directionsListContainer');
+                if (diffY > 0) {
+                    // Swipe up - expand directions
+                    container.classList.add('expanded');
+                    document.getElementById('directionsArrow').classList.add('expanded');
+                    document.getElementById('directionsToggleText').textContent = '📋 Directions';
+                } else {
+                    // Swipe down - collapse directions
+                    container.classList.remove('expanded');
+                    document.getElementById('directionsArrow').classList.remove('expanded');
+                    document.getElementById('directionsToggleText').textContent = '📋 Tap to see directions';
+                }
+            }
+        }, { passive: true });
+    }
     
     function showScreen(id) {
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -1040,24 +1079,38 @@
     
     async function fetchAutocomplete(query) {
         try {
-            const res = await fetch(`https://api.openrouteservice.org/geocode/autocomplete?api_key=${API_KEY}&text=${encodeURIComponent(query)}&size=5`);
+            // Use Nominatim for better POI/business search with location bias
+            let url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=8&addressdetails=1`;
+            
+            // Add location bias for local results
+            if (userLat && userLon) {
+                // Viewbox: lon1,lat1,lon2,lat2 (SW corner to NE corner) - ~50 mile radius
+                const bias = 0.7; // roughly 50 miles
+                url += `&viewbox=${userLon - bias},${userLat - bias},${userLon + bias},${userLat + bias}&bounded=0`;
+            }
+            
+            const res = await fetch(url, {
+                headers: { 'User-Agent': 'GenesisTruckerGPS/1.0' }
+            });
             const data = await res.json();
             
-            if (!data.features?.length) {
+            if (!data?.length) {
                 hideAutocomplete();
                 return;
             }
             
             const dropdown = document.getElementById('autocompleteDropdown');
-            dropdown.innerHTML = data.features.map(f => {
-                const name = f.properties.name || f.properties.label;
-                const region = f.properties.region || f.properties.country || '';
+            dropdown.innerHTML = data.map(place => {
+                const name = place.name || place.display_name.split(',')[0];
+                const address = place.display_name;
+                const dist = userLat ? getDistanceText(userLat, userLon, parseFloat(place.lat), parseFloat(place.lon)) : '';
+                const icon = getPlaceIcon(place.type, place.class);
                 return `
-                    <div class="autocomplete-item" onclick="selectAutocomplete(${f.geometry.coordinates[1]}, ${f.geometry.coordinates[0]}, '${(f.properties.label || '').replace(/'/g, "\\'")}')">
-                        <span class="autocomplete-icon">📍</span>
+                    <div class="autocomplete-item" onclick="selectAutocomplete(${place.lat}, ${place.lon}, '${address.replace(/'/g, "\\'")}')">
+                        <span class="autocomplete-icon">${icon}</span>
                         <div class="autocomplete-text">
                             <div class="autocomplete-main">${name}</div>
-                            <div class="autocomplete-sub">${f.properties.label || region}</div>
+                            <div class="autocomplete-sub">${address.substring(0, 60)}${address.length > 60 ? '...' : ''}${dist ? ' • ' + dist : ''}</div>
                         </div>
                     </div>
                 `;
@@ -1070,12 +1123,31 @@
         }
     }
     
+    function getPlaceIcon(type, cls) {
+        if (cls === 'shop' || type === 'supermarket' || type === 'convenience') return '🛒';
+        if (cls === 'amenity' && type === 'fuel') return '⛽';
+        if (cls === 'amenity' && type === 'restaurant') return '🍽️';
+        if (cls === 'amenity' && type === 'fast_food') return '🍔';
+        if (cls === 'amenity' && type === 'parking') return '🅿️';
+        if (cls === 'tourism' || type === 'hotel' || type === 'motel') return '🏨';
+        if (type === 'hospital' || type === 'clinic') return '🏥';
+        if (type === 'pharmacy') return '💊';
+        return '📍';
+    }
+    
+    function getDistanceText(lat1, lon1, lat2, lon2) {
+        const miles = getDist(lat1, lon1, lat2, lon2);
+        if (miles < 1) return Math.round(miles * 5280) + ' ft';
+        if (miles < 10) return miles.toFixed(1) + ' mi';
+        return Math.round(miles) + ' mi';
+    }
+    
     function selectAutocomplete(lat, lon, label) {
         document.getElementById('searchInput').value = label;
         hideAutocomplete();
         hideRecent();
         
-        destCoords = { lat, lon };
+        destCoords = { lat: parseFloat(lat), lon: parseFloat(lon) };
         destName = label;
         
         saveRecent(destName, lat, lon);
@@ -1118,17 +1190,33 @@
         showLoading(true);
         
         try {
-            const res = await fetch(`https://api.openrouteservice.org/geocode/search?api_key=${API_KEY}&text=${encodeURIComponent(q)}&size=1`);
-            const data = await res.json();
-            if (!data.features?.length) { alert('Address not found. Try adding city and state.'); showLoading(false); return; }
+            // Use Nominatim for better POI search
+            let url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1&addressdetails=1`;
             
-            const c = data.features[0].geometry.coordinates;
-            destCoords = { lat: c[1], lon: c[0] };
-            destName = data.features[0].properties.label || q;
+            // Add location bias
+            if (userLat && userLon) {
+                const bias = 0.7;
+                url += `&viewbox=${userLon - bias},${userLat - bias},${userLon + bias},${userLat + bias}&bounded=0`;
+            }
+            
+            const res = await fetch(url, {
+                headers: { 'User-Agent': 'GenesisTruckerGPS/1.0' }
+            });
+            const data = await res.json();
+            
+            if (!data?.length) { 
+                alert('Location not found. Try adding city and state, or search for a nearby landmark.'); 
+                showLoading(false); 
+                return; 
+            }
+            
+            const place = data[0];
+            destCoords = { lat: parseFloat(place.lat), lon: parseFloat(place.lon) };
+            destName = place.display_name;
             
             document.getElementById('searchInput').value = destName;
             
-            saveRecent(destName, c[1], c[0]);
+            saveRecent(destName, place.lat, place.lon);
             await calcRoute();
         } catch(e) { console.error(e); alert('Search failed'); }
         showLoading(false);
@@ -1151,16 +1239,31 @@
         showLoading(true);
         
         try {
-            // Fetch both truck and car routes in parallel
-            const [truckRes, carRes] = await Promise.all([
-                fetch(`https://api.openrouteservice.org/v2/directions/driving-hgv?api_key=${API_KEY}&start=${userLon},${userLat}&end=${destCoords.lon},${destCoords.lat}`),
-                fetch(`https://api.openrouteservice.org/v2/directions/driving-car?api_key=${API_KEY}&start=${userLon},${userLat}&end=${destCoords.lon},${destCoords.lat}`)
-            ]);
+            // Based on routeMode setting, fetch only needed routes
+            let truckData = null, carData = null;
             
-            const truckData = await truckRes.json();
-            const carData = await carRes.json();
+            if (routeMode === 'truck') {
+                // Only fetch truck route
+                const truckRes = await fetch(`https://api.openrouteservice.org/v2/directions/driving-hgv?api_key=${API_KEY}&start=${userLon},${userLat}&end=${destCoords.lon},${destCoords.lat}`);
+                truckData = await truckRes.json();
+            } else if (routeMode === 'car') {
+                // Only fetch car route
+                const carRes = await fetch(`https://api.openrouteservice.org/v2/directions/driving-car?api_key=${API_KEY}&start=${userLon},${userLat}&end=${destCoords.lon},${destCoords.lat}`);
+                carData = await carRes.json();
+            } else {
+                // Fetch both routes for comparison
+                const [truckRes, carRes] = await Promise.all([
+                    fetch(`https://api.openrouteservice.org/v2/directions/driving-hgv?api_key=${API_KEY}&start=${userLon},${userLat}&end=${destCoords.lon},${destCoords.lat}`),
+                    fetch(`https://api.openrouteservice.org/v2/directions/driving-car?api_key=${API_KEY}&start=${userLon},${userLat}&end=${destCoords.lon},${destCoords.lat}`)
+                ]);
+                truckData = await truckRes.json();
+                carData = await carRes.json();
+            }
             
-            if (!truckData.features?.length && !carData.features?.length) { 
+            const hasTruck = truckData?.features?.length > 0;
+            const hasCar = carData?.features?.length > 0;
+            
+            if (!hasTruck && !hasCar) { 
                 alert('No route found'); 
                 showLoading(false); 
                 return; 
@@ -1169,35 +1272,55 @@
             clearRouteDisplay();
             
             // Store route data
-            truckRouteData = truckData.features?.[0] || null;
-            carRouteData = carData.features?.[0] || null;
+            truckRouteData = hasTruck ? truckData.features[0] : null;
+            carRouteData = hasCar ? carData.features[0] : null;
             
-            // Draw both routes (car first so truck is on top)
-            if (carRouteData) {
+            // Draw routes based on routeMode
+            if (carRouteData && (routeMode === 'car' || routeMode === 'both')) {
                 const carCoords = carRouteData.geometry.coordinates.map(c => [c[1], c[0]]);
-                carRouteLine = L.polyline(carCoords, { color: '#888', weight: 5, opacity: 0.5, dashArray: '10, 10' }).addTo(map);
+                const isActive = routeMode === 'car' || (routeMode === 'both' && selectedRouteType === 'car');
+                carRouteLine = L.polyline(carCoords, { 
+                    color: isActive ? '#e94560' : '#888', 
+                    weight: isActive ? 6 : 5, 
+                    opacity: isActive ? 1 : 0.5, 
+                    dashArray: isActive ? null : '10, 10' 
+                }).addTo(map);
                 
                 const carDist = carRouteData.properties.summary.distance;
                 const carTime = carRouteData.properties.summary.duration;
                 document.getElementById('carRouteTime').textContent = formatDuration(carTime);
                 document.getElementById('carRouteDist').textContent = (carDist/1609.34).toFixed(1) + ' mi';
                 
-                // Store car route steps
                 carRouteSteps = carRouteData.properties.segments[0].steps;
             }
             
-            if (truckRouteData) {
+            if (truckRouteData && (routeMode === 'truck' || routeMode === 'both')) {
                 const truckCoords = truckRouteData.geometry.coordinates.map(c => [c[1], c[0]]);
-                truckRouteLine = L.polyline(truckCoords, { color: '#0984e3', weight: 6 }).addTo(map);
+                const isActive = routeMode === 'truck' || (routeMode === 'both' && selectedRouteType === 'truck');
+                truckRouteLine = L.polyline(truckCoords, { 
+                    color: isActive ? '#0984e3' : '#888', 
+                    weight: isActive ? 6 : 5,
+                    opacity: isActive ? 1 : 0.5,
+                    dashArray: isActive ? null : '10, 10'
+                }).addTo(map);
                 
                 const truckDist = truckRouteData.properties.summary.distance;
                 const truckTime = truckRouteData.properties.summary.duration;
                 document.getElementById('truckRouteTime').textContent = formatDuration(truckTime);
                 document.getElementById('truckRouteDist').textContent = (truckDist/1609.34).toFixed(1) + ' mi';
                 
-                // Store truck route steps
                 truckRouteSteps = truckRouteData.properties.segments[0].steps;
-                routeSteps = truckRouteSteps; // Default to truck
+            }
+            
+            // Set route steps based on mode
+            if (routeMode === 'truck' && truckRouteSteps) {
+                routeSteps = truckRouteSteps;
+                selectedRouteType = 'truck';
+            } else if (routeMode === 'car' && carRouteSteps) {
+                routeSteps = carRouteSteps;
+                selectedRouteType = 'car';
+            } else {
+                routeSteps = truckRouteSteps || carRouteSteps;
             }
             
             // Add destination marker
@@ -1205,11 +1328,16 @@
                 icon: L.divIcon({ html: '<div class="dest-marker">📍</div>', className: '', iconSize: [30,30], iconAnchor: [15,30] }) 
             }).addTo(map);
             
-            // Fit to show the selected route
-            const activeLine = selectedRouteType === 'truck' ? truckRouteLine : carRouteLine;
+            // Fit to show the route
+            const activeLine = truckRouteLine || carRouteLine;
             if (activeLine) map.fitBounds(activeLine.getBounds(), { padding: [50, 100] });
             
             document.getElementById('routeDest').textContent = destName;
+            
+            // Show/hide route options based on mode
+            document.getElementById('truckRouteOption').style.display = (routeMode === 'truck' || routeMode === 'both') ? 'flex' : 'none';
+            document.getElementById('carRouteOption').style.display = (routeMode === 'car' || routeMode === 'both') ? 'flex' : 'none';
+            
             selectRouteOption(selectedRouteType);
             
             document.getElementById('routeCard').classList.add('show');
@@ -1268,6 +1396,31 @@
     // Store directions for both routes
     let truckRouteSteps = [];
     let carRouteSteps = [];
+    let routeCardTouchStartY = 0;
+    
+    // Setup swipe gestures for route card directions
+    document.addEventListener('DOMContentLoaded', () => {
+        const routeCard = document.getElementById('routeCard');
+        if (routeCard) {
+            routeCard.addEventListener('touchstart', (e) => {
+                routeCardTouchStartY = e.touches[0].clientY;
+            }, { passive: true });
+            
+            routeCard.addEventListener('touchend', (e) => {
+                const touchEndY = e.changedTouches[0].clientY;
+                const diff = routeCardTouchStartY - touchEndY;
+                const container = document.getElementById('directionsListContainer');
+                
+                if (diff > 50 && !container.classList.contains('expanded')) {
+                    // Swipe up - expand directions
+                    toggleDirectionsInCard();
+                } else if (diff < -50 && container.classList.contains('expanded')) {
+                    // Swipe down - collapse directions
+                    toggleDirectionsInCard();
+                }
+            }, { passive: true });
+        }
+    });
     
     function buildDirectionsList() {
         const list = document.getElementById('directionsList');
@@ -1384,7 +1537,7 @@
         updateUpcomingSteps();
         
         // Force zoom to street level for turn-by-turn view
-        map.setView([userLat, userLon], 17);
+        map.setView([userLat, userLon], 18);
         
         // Start voice after a short delay
         if (voiceOn && voiceLang !== 'off') {
