@@ -1082,21 +1082,36 @@
             // Use Nominatim for better POI/business search with location bias
             let url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=8&addressdetails=1`;
             
-            // Add location bias for local results
+            // Add location bias for local results - tight 15 mile radius first
             if (userLat && userLon) {
-                // Viewbox: lon1,lat1,lon2,lat2 (SW corner to NE corner) - ~50 mile radius
-                const bias = 0.7; // roughly 50 miles
-                url += `&viewbox=${userLon - bias},${userLat - bias},${userLon + bias},${userLat + bias}&bounded=0`;
+                const bias = 0.22; // roughly 15 miles - prioritize nearby
+                url += `&viewbox=${userLon - bias},${userLat - bias},${userLon + bias},${userLat + bias}&bounded=1`;
             }
             
-            const res = await fetch(url, {
+            let res = await fetch(url, {
                 headers: { 'User-Agent': 'GenesisTruckerGPS/1.0' }
             });
-            const data = await res.json();
+            let data = await res.json();
+            
+            // If no results in tight radius, try wider search
+            if ((!data?.length) && userLat && userLon) {
+                const widerUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=8&addressdetails=1&viewbox=${userLon - 0.5},${userLat - 0.5},${userLon + 0.5},${userLat + 0.5}&bounded=0`;
+                res = await fetch(widerUrl, { headers: { 'User-Agent': 'GenesisTruckerGPS/1.0' } });
+                data = await res.json();
+            }
             
             if (!data?.length) {
                 hideAutocomplete();
                 return;
+            }
+            
+            // Sort by distance from user
+            if (userLat && userLon) {
+                data.sort((a, b) => {
+                    const distA = getDist(userLat, userLon, parseFloat(a.lat), parseFloat(a.lon));
+                    const distB = getDist(userLat, userLon, parseFloat(b.lat), parseFloat(b.lon));
+                    return distA - distB;
+                });
             }
             
             const dropdown = document.getElementById('autocompleteDropdown');
@@ -1195,8 +1210,8 @@
             
             // Add location bias
             if (userLat && userLon) {
-                const bias = 0.7;
-                url += `&viewbox=${userLon - bias},${userLat - bias},${userLon + bias},${userLat + bias}&bounded=0`;
+                const bias = 0.22; // roughly 15 miles
+                url += `&viewbox=${userLon - bias},${userLat - bias},${userLon + bias},${userLat + bias}&bounded=1`;
             }
             
             const res = await fetch(url, {
@@ -1205,8 +1220,27 @@
             const data = await res.json();
             
             if (!data?.length) { 
-                alert('Location not found. Try adding city and state, or search for a nearby landmark.'); 
-                showLoading(false); 
+                // Try again without bounded restriction
+                let retryUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1&addressdetails=1`;
+                if (userLat && userLon) {
+                    retryUrl += `&viewbox=${userLon - 0.5},${userLat - 0.5},${userLon + 0.5},${userLat + 0.5}&bounded=0`;
+                }
+                const retryRes = await fetch(retryUrl, { headers: { 'User-Agent': 'GenesisTruckerGPS/1.0' } });
+                const retryData = await retryRes.json();
+                
+                if (!retryData?.length) {
+                    alert('Location not found. Try adding city and state, or search for a nearby landmark.'); 
+                    showLoading(false); 
+                    return;
+                }
+                
+                const place = retryData[0];
+                destCoords = { lat: parseFloat(place.lat), lon: parseFloat(place.lon) };
+                destName = place.display_name;
+                document.getElementById('searchInput').value = destName;
+                saveRecent(destName, place.lat, place.lon);
+                await calcRoute();
+                showLoading(false);
                 return; 
             }
             
