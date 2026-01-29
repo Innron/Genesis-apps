@@ -7,6 +7,8 @@
     <title>📮 Genesis Postal Clock</title>
     <!-- OpenCV.js for document scanning -->
     <script async src="https://docs.opencv.org/4.7.0/opencv.js" onload="onOpenCvReady()"></script>
+    <!-- Tesseract.js for OCR -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <!-- Leaflet for maps -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -375,38 +377,50 @@
     </div>
     
     <!-- Package Navigation Full Screen -->
-    <div id="pkgNavigationScreen" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:2000;background:#1a1a2e;">
-        <!-- Map -->
-        <div id="pkgMap" style="width:100%;height:100%;"></div>
+    <div id="pkgNavigationScreen" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:2000;background:#1a1a2e;overflow:hidden;">
+        <!-- Map - leave room for panels -->
+        <div id="pkgMap" style="position:absolute;top:80px;left:0;right:0;bottom:220px;"></div>
         
         <!-- Top info bar -->
-        <div style="position:absolute;top:0;left:0;right:0;background:linear-gradient(135deg,#1a1a2e,#16213e);padding:15px;padding-top:max(15px, env(safe-area-inset-top));z-index:10;">
+        <div style="position:absolute;top:0;left:0;right:0;height:80px;background:linear-gradient(135deg,#1a1a2e,#16213e);padding:15px;padding-top:max(15px, env(safe-area-inset-top));z-index:20;">
             <div style="display:flex;justify-content:space-between;align-items:center;">
-                <div>
-                    <div style="font-size:12px;color:#888;">DELIVERING TO</div>
-                    <div id="pkgCurrentAddress" style="font-size:16px;font-weight:600;color:#fff;">Loading...</div>
+                <div style="flex:1;">
+                    <div style="font-size:11px;color:#888;">DELIVERING TO</div>
+                    <div id="pkgCurrentAddress" style="font-size:14px;font-weight:600;color:#fff;line-height:1.3;max-height:40px;overflow:hidden;">Loading...</div>
                 </div>
-                <div style="text-align:right;">
+                <div style="text-align:right;margin-left:15px;">
                     <div id="pkgStopNum" style="font-size:24px;font-weight:700;color:#00b894;">1</div>
-                    <div id="pkgStopTotal" style="font-size:12px;color:#888;">of 0 stops</div>
+                    <div id="pkgStopTotal" style="font-size:11px;color:#888;">of 0 stops</div>
                 </div>
             </div>
         </div>
         
-        <!-- Bottom panel with upcoming stops -->
-        <div id="pkgNavBottomPanel" style="position:absolute;bottom:0;left:0;right:0;background:#fff;border-radius:20px 20px 0 0;padding:15px;padding-bottom:max(15px, env(safe-area-inset-bottom));z-index:10;">
-            <div style="width:40px;height:4px;background:#ddd;border-radius:2px;margin:0 auto 15px;"></div>
+        <!-- Bottom panel with controls and upcoming stops - ALWAYS VISIBLE -->
+        <div id="pkgNavBottomPanel" style="position:absolute;bottom:0;left:0;right:0;height:220px;background:#fff;border-radius:20px 20px 0 0;padding:15px;padding-bottom:max(15px, env(safe-area-inset-bottom));z-index:20;box-shadow:0 -5px 20px rgba(0,0,0,0.2);">
+            <div style="width:40px;height:4px;background:#ddd;border-radius:2px;margin:0 auto 12px;"></div>
             
-            <!-- Controls -->
-            <div id="pkgNavControls" style="display:flex;gap:10px;margin-bottom:15px;">
-                <button onclick="markDelivered()" style="flex:2;padding:14px;background:#00b894;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;">✓ Delivered</button>
-                <button onclick="skipStop()" style="flex:1;padding:14px;background:#f0f0f0;color:#333;border:none;border-radius:12px;font-size:14px;cursor:pointer;">Skip</button>
-                <button onclick="endPackageNavigation()" style="flex:1;padding:14px;background:#e74c3c;color:#fff;border:none;border-radius:12px;font-size:14px;cursor:pointer;">End</button>
+            <!-- Controls - ALWAYS VISIBLE -->
+            <div id="pkgNavControls" style="display:flex;gap:10px;margin-bottom:12px;">
+                <button onclick="markDelivered()" style="flex:2;padding:16px;background:#00b894;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;box-shadow:0 3px 10px rgba(0,184,148,0.3);">✓ Delivered</button>
+                <button onclick="skipStop()" style="flex:1;padding:16px;background:#f0f0f0;color:#333;border:none;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;">Skip</button>
+                <button onclick="endPackageNavigation()" style="flex:1;padding:16px;background:#e74c3c;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;">End</button>
             </div>
             
             <!-- Upcoming stops -->
-            <div style="font-size:12px;color:#888;margin-bottom:10px;">UPCOMING STOPS</div>
-            <div id="pkgUpcomingStops"></div>
+            <div style="font-size:11px;color:#888;margin-bottom:8px;font-weight:600;">UPCOMING STOPS</div>
+            <div id="pkgUpcomingStops" style="max-height:100px;overflow-y:auto;"></div>
+        </div>
+    </div>
+    
+    <!-- Address Selection Modal (for OCR multiple addresses) -->
+    <div class="modal" id="addressSelectModal">
+        <div class="modal-content" style="max-height:80vh;overflow-y:auto;">
+            <div class="modal-title">📍 Select Delivery Address</div>
+            <div style="font-size:13px;color:#888;margin-bottom:15px;">Multiple addresses found. Tap the DELIVERY address:</div>
+            <div id="addressSelectList"></div>
+            <div class="modal-btns" style="margin-top:15px;">
+                <button class="modal-btn modal-btn-cancel" onclick="closeModal('addressSelectModal');manualAddressEntry();">Enter Manually</button>
+            </div>
         </div>
     </div>
     
@@ -2109,46 +2123,176 @@
     }
     
     // Handle package label scan
+    let pendingImageData = null;
+    let pendingPackageId = null;
+    
     async function handlePackageScan(event) {
         const file = event.target.files[0];
         if (!file) return;
         
-        showToast('Processing label...');
+        showToast('Scanning label... please wait');
         
         const reader = new FileReader();
         reader.onload = async (e) => {
             const imageData = e.target.result;
+            pendingImageData = imageData;
+            pendingPackageId = Date.now();
             
-            // Try to extract address using OCR (Tesseract.js or manual entry)
-            const address = await extractAddressFromImage(imageData);
+            // Try to extract addresses using OCR
+            const addresses = await extractAddressesFromImage(imageData);
             
-            scannedPackages.push({
-                id: Date.now(),
-                image: imageData,
-                address: address || '',
-                status: address ? 'extracted' : 'manual',
-                timestamp: Date.now()
-            });
-            
-            savePackages();
-            renderScannedPackages();
-            
-            if (!address) {
-                showToast('Could not read address. Please enter manually.');
+            if (addresses.length === 0) {
+                // No addresses found - prompt manual entry
+                manualAddressEntry();
+            } else if (addresses.length === 1) {
+                // One address found - use it
+                addPackageWithAddress(addresses[0]);
             } else {
-                showToast('Address extracted!');
+                // Multiple addresses found - let user pick
+                showAddressSelection(addresses);
             }
         };
         reader.readAsDataURL(file);
         event.target.value = '';
     }
     
-    // Simple OCR simulation - in production would use Tesseract.js
-    async function extractAddressFromImage(imageData) {
-        // For now, prompt user to enter address
-        // In a full implementation, we'd use Tesseract.js OCR here
+    // Real OCR using Tesseract.js
+    async function extractAddressesFromImage(imageData) {
+        try {
+            showToast('Reading text from label...');
+            
+            // Use Tesseract to extract text
+            const result = await Tesseract.recognize(imageData, 'eng', {
+                logger: m => {
+                    if (m.status === 'recognizing text') {
+                        const pct = Math.round(m.progress * 100);
+                        if (pct % 20 === 0) showToast(`Scanning... ${pct}%`);
+                    }
+                }
+            });
+            
+            const text = result.data.text;
+            console.log('OCR Result:', text);
+            
+            // Extract addresses from the text
+            const addresses = parseAddressesFromText(text);
+            
+            return addresses;
+        } catch (e) {
+            console.error('OCR Error:', e);
+            showToast('OCR failed. Please enter manually.');
+            return [];
+        }
+    }
+    
+    // Parse addresses from OCR text
+    function parseAddressesFromText(text) {
+        const addresses = [];
+        const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+        
+        // Common US address patterns
+        // Look for lines with street numbers + street names
+        const streetPattern = /^\d+\s+[\w\s]+(?:st|street|ave|avenue|rd|road|dr|drive|ln|lane|blvd|boulevard|ct|court|way|pl|place|cir|circle)\b/i;
+        const cityStateZipPattern = /^[\w\s]+,?\s*[A-Z]{2}\s*\d{5}(-\d{4})?$/i;
+        
+        let currentAddress = [];
+        
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            
+            // Check if line looks like a street address
+            if (streetPattern.test(line)) {
+                // Start a new address
+                if (currentAddress.length > 0) {
+                    const addr = currentAddress.join(', ');
+                    if (addr.length > 10) addresses.push(addr);
+                }
+                currentAddress = [line];
+            }
+            // Check if line looks like city, state zip
+            else if (cityStateZipPattern.test(line) && currentAddress.length > 0) {
+                currentAddress.push(line);
+                const addr = currentAddress.join(', ');
+                if (addr.length > 10) addresses.push(addr);
+                currentAddress = [];
+            }
+            // Check for apartment/unit numbers to add to current address
+            else if (currentAddress.length > 0 && /^(apt|unit|suite|#|ste)\s*\d+/i.test(line)) {
+                currentAddress[0] += ' ' + line;
+            }
+        }
+        
+        // Add any remaining address
+        if (currentAddress.length > 0) {
+            const addr = currentAddress.join(', ');
+            if (addr.length > 10) addresses.push(addr);
+        }
+        
+        // Also try to find full address patterns in a single line
+        const fullAddressPattern = /\d+\s+[\w\s]+(?:st|street|ave|avenue|rd|road|dr|drive|ln|lane|blvd|ct|way|pl|cir)[,.\s]+[\w\s]+,?\s*[A-Z]{2}\s*\d{5}/gi;
+        const fullMatches = text.match(fullAddressPattern);
+        if (fullMatches) {
+            fullMatches.forEach(m => {
+                const cleaned = m.replace(/\s+/g, ' ').trim();
+                if (!addresses.some(a => a.toLowerCase().includes(cleaned.substring(0, 20).toLowerCase()))) {
+                    addresses.push(cleaned);
+                }
+            });
+        }
+        
+        // Remove duplicates and clean up
+        const unique = [...new Set(addresses.map(a => a.replace(/\s+/g, ' ').trim()))];
+        
+        return unique.filter(a => a.length >= 15); // Minimum address length
+    }
+    
+    // Show address selection modal
+    function showAddressSelection(addresses) {
+        const list = document.getElementById('addressSelectList');
+        list.innerHTML = addresses.map((addr, i) => `
+            <div onclick="selectFoundAddress('${addr.replace(/'/g, "\\'")}')" style="padding:15px;background:rgba(255,255,255,0.1);border-radius:10px;margin-bottom:10px;cursor:pointer;border:2px solid transparent;" onmousedown="this.style.borderColor='#00b894'" onmouseup="this.style.borderColor='transparent'">
+                <div style="font-size:14px;font-weight:500;">${addr}</div>
+            </div>
+        `).join('');
+        
+        document.getElementById('addressSelectModal').classList.add('show');
+    }
+    
+    function selectFoundAddress(address) {
+        closeModal('addressSelectModal');
+        addPackageWithAddress(address);
+    }
+    
+    function manualAddressEntry() {
         const address = prompt('Enter the delivery address from the label:');
-        return address ? address.trim() : null;
+        if (address && address.trim()) {
+            addPackageWithAddress(address.trim());
+        } else {
+            // Add with empty address for later editing
+            addPackageWithAddress('');
+        }
+    }
+    
+    function addPackageWithAddress(address) {
+        scannedPackages.push({
+            id: pendingPackageId || Date.now(),
+            image: pendingImageData,
+            address: address,
+            status: address ? 'extracted' : 'manual',
+            timestamp: Date.now()
+        });
+        
+        savePackages();
+        renderScannedPackages();
+        
+        pendingImageData = null;
+        pendingPackageId = null;
+        
+        if (address) {
+            showToast('Address added!');
+        } else {
+            showToast('Package added. Edit address in Review step.');
+        }
     }
     
     function savePackages() {
@@ -2171,8 +2315,8 @@
             <div class="pkg-scanned-item">
                 <img src="${pkg.image}" class="pkg-scanned-thumb" onclick="viewPackageImage(${pkg.id})">
                 <div class="pkg-scanned-info">
-                    <div class="pkg-scanned-address">${pkg.address || '(No address)'}</div>
-                    <div class="pkg-scanned-status">${pkg.status === 'extracted' ? '✓ Auto-extracted' : '✏️ Manual entry needed'}</div>
+                    <div class="pkg-scanned-address">${pkg.address || '(No address - tap to edit)'}</div>
+                    <div class="pkg-scanned-status">${pkg.status === 'extracted' ? '✓ Auto-extracted' : '✏️ Needs review'}</div>
                 </div>
                 <button class="pkg-scanned-delete" onclick="deletePackage(${pkg.id})">✕</button>
             </div>
