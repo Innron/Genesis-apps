@@ -2246,11 +2246,15 @@
         return unique.filter(a => a.length >= 15); // Minimum address length
     }
     
+    // Store found addresses for selection
+    let foundAddresses = [];
+    
     // Show address selection modal
     function showAddressSelection(addresses) {
+        foundAddresses = addresses; // Store for later use
         const list = document.getElementById('addressSelectList');
         list.innerHTML = addresses.map((addr, i) => `
-            <div onclick="selectFoundAddress('${addr.replace(/'/g, "\\'")}')" style="padding:15px;background:rgba(255,255,255,0.1);border-radius:10px;margin-bottom:10px;cursor:pointer;border:2px solid transparent;" onmousedown="this.style.borderColor='#00b894'" onmouseup="this.style.borderColor='transparent'">
+            <div onclick="selectFoundAddressIndex(${i})" style="padding:15px;background:rgba(255,255,255,0.1);border-radius:10px;margin-bottom:10px;cursor:pointer;border:2px solid transparent;transition:all 0.2s;" ontouchstart="this.style.background='rgba(0,184,148,0.3)';this.style.borderColor='#00b894'" ontouchend="this.style.background='rgba(255,255,255,0.1)';this.style.borderColor='transparent'">
                 <div style="font-size:14px;font-weight:500;">${addr}</div>
             </div>
         `).join('');
@@ -2258,9 +2262,12 @@
         document.getElementById('addressSelectModal').classList.add('show');
     }
     
-    function selectFoundAddress(address) {
-        closeModal('addressSelectModal');
-        addPackageWithAddress(address);
+    function selectFoundAddressIndex(index) {
+        const address = foundAddresses[index];
+        if (address) {
+            closeModal('addressSelectModal');
+            addPackageWithAddress(address);
+        }
     }
     
     function manualAddressEntry() {
