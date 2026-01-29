@@ -475,38 +475,32 @@
     // ==================== TASK DEFINITIONS ====================
     const TASKS = {
         carrier: [
-            { id: 'box_parcels', name: 'Box Parcels', icon: '📦' },
-            { id: 'box_letters', name: 'Box Letters', icon: '✉️' },
-            { id: 'throwing', name: 'Throwing', icon: '🎯' },
-            { id: 'loading', name: 'Loading', icon: '🚚' },
-            { id: 'delivering', name: 'Delivering', icon: '🚶' },
-            { id: 'misc', name: 'Miscellaneous', icon: '📋' }
+            { id: 'casing', name: 'Casing Mail', icon: '📬', needsRoute: true },
+            { id: 'organizing_parcels', name: 'Organizing Parcels', icon: '📦', needsRoute: true },
+            { id: 'loading', name: 'Loading Truck', icon: '🚚', needsRoute: true },
+            { id: 'delivering', name: 'Delivering Mail', icon: '🚶', needsRoute: true }
         ],
         clerk: [
+            { id: 'throwing_parcels', name: 'Throwing Parcels', icon: '📦' },
+            { id: 'box_mail_parcels', name: 'Box Mail/Parcels', icon: '📬' },
             { id: 'window', name: 'Window Services', icon: '🪟' },
             { id: 'sorting_letters', name: 'Sorting Letters', icon: '✉️' },
-            { id: 'throwing_parcels', name: 'Throwing Parcels', icon: '📦' },
-            { id: 'box_section', name: 'Box Section', icon: '📬' },
-            { id: 'dispatch', name: 'Dispatch', icon: '🚛' },
+            { id: 'accountable', name: 'Accountable', icon: '📝' },
+            { id: 'rfs', name: 'RFS', icon: '🔄' },
+            { id: 'pars_dispatch', name: 'PARS Dispatch', icon: '🚛' },
             { id: 'training', name: 'Training', icon: '📚' },
             { id: 'misc', name: 'Miscellaneous', icon: '📋' }
         ],
         '204b': [
-            { id: 'supervision', name: 'Supervision', icon: '👔' },
-            { id: 'scheduling', name: 'Scheduling', icon: '📅' },
-            { id: 'training', name: 'Training', icon: '📚' },
-            { id: 'misc', name: 'Miscellaneous', icon: '📋' }
+            { id: 'custom', name: 'Add Task Entry', icon: '✏️', isCustom: true }
         ],
         supervisor: [
-            { id: 'supervision', name: 'Supervision', icon: '👔' },
-            { id: 'scheduling', name: 'Scheduling', icon: '📅' },
-            { id: 'admin', name: 'Admin', icon: '💼' },
-            { id: 'misc', name: 'Miscellaneous', icon: '📋' }
+            { id: 'custom', name: 'Add Task Entry', icon: '✏️', isCustom: true }
         ]
     };
     
     // ==================== STATE ====================
-    const STORE_KEY = 'postal_clock_pro';
+    const STORE_KEY = 'postal_clock';
     let state = {
         isClockedIn: false,
         clockInTime: null,
@@ -514,6 +508,7 @@
         office: 'Mansfield',
         offices: ['Mansfield'],
         currentTask: null,
+        currentRoute: null,
         taskTimes: {},
         taskStartTime: null,
         entries: [],
@@ -521,6 +516,7 @@
         greenCard: null, // Legacy
         greenCardImages: [], // New: array of images
         gpsArrival: null,
+        customEntries: [],
         settings: {
             geofenceEnabled: 'on',
             geofenceRadius: '200',
@@ -654,8 +650,34 @@
     function renderTasks() {
         const tasks = TASKS[state.position] || TASKS.carrier;
         const grid = document.getElementById('taskGrid');
-        grid.innerHTML = tasks.map(t => `
-            <button class="task-btn ${state.currentTask === t.id ? 'active' : ''}" onclick="selectTask('${t.id}')">
+        
+        // For 204B/Supervisor show custom entry form
+        if (state.position === '204b' || state.position === 'supervisor') {
+            grid.innerHTML = `
+                <div style="grid-column: 1 / -1; padding: 10px;">
+                    <input type="text" id="customTaskInput" placeholder="Enter task description..." 
+                           style="width:100%;padding:14px;border-radius:12px;border:1px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.1);color:#fff;font-size:14px;margin-bottom:10px;">
+                    <button onclick="addCustomTask()" style="width:100%;padding:14px;border:none;border-radius:12px;background:#00b894;color:#fff;font-size:15px;font-weight:600;cursor:pointer;">
+                        ✏️ Add Entry
+                    </button>
+                </div>
+            `;
+            return;
+        }
+        
+        // For Carriers, show Switch Route button if on a route
+        let routeHtml = '';
+        if (state.position === 'carrier' && state.currentRoute) {
+            routeHtml = `
+                <div style="grid-column: 1 / -1; background:rgba(0,184,148,0.2);padding:10px;border-radius:10px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
+                    <span style="font-size:14px;">📍 Route: <strong>${state.currentRoute}</strong></span>
+                    <button onclick="switchRoute()" style="padding:8px 15px;border:none;border-radius:8px;background:#0984e3;color:#fff;font-size:13px;cursor:pointer;">🔄 Switch Route</button>
+                </div>
+            `;
+        }
+        
+        grid.innerHTML = routeHtml + tasks.map(t => `
+            <button class="task-btn ${state.currentTask === t.id ? 'active' : ''}" onclick="selectTask('${t.id}', ${t.needsRoute || false})">
                 <span class="task-btn-icon">${t.icon}</span>${t.name}
             </button>
         `).join('');
@@ -667,6 +689,24 @@
         let totalMs = 0;
         
         let html = '';
+        
+        // For 204B/Supervisor, show custom entries
+        if (state.position === '204b' || state.position === 'supervisor') {
+            if (state.customEntries && state.customEntries.length > 0) {
+                state.customEntries.forEach((entry, i) => {
+                    html += `
+                        <div class="breakdown-item" style="cursor:pointer;" onclick="removeCustomEntry(${i})">
+                            <span>📝 ${entry.text}</span>
+                            <span class="breakdown-time" style="color:#888;">${entry.time}</span>
+                        </div>
+                    `;
+                });
+            }
+            list.innerHTML = html || '<div style="text-align:center;color:#888;padding:10px;">No entries yet. Use the field above to add tasks.</div>';
+            document.getElementById('breakdownTotal').textContent = '--';
+            return;
+        }
+        
         tasks.forEach(t => {
             let ms = state.taskTimes[t.id] || 0;
             
@@ -677,12 +717,69 @@
             
             totalMs += ms;
             if (ms > 0) {
-                html += `<div class="breakdown-item"><span>${t.icon} ${t.name}</span><span class="breakdown-time">${formatTime(ms)}</span></div>`;
+                const routeInfo = state.currentRoute && t.needsRoute ? ` (${state.currentRoute})` : '';
+                html += `<div class="breakdown-item"><span>${t.icon} ${t.name}${routeInfo}</span><span class="breakdown-time">${formatTime(ms)}</span></div>`;
             }
         });
         
         list.innerHTML = html || '<div style="text-align:center;color:#888;padding:10px;">No tasks recorded yet</div>';
         document.getElementById('breakdownTotal').textContent = formatTime(totalMs);
+    }
+    
+    function addCustomTask() {
+        const input = document.getElementById('customTaskInput');
+        const text = input.value.trim();
+        if (!text) return;
+        
+        if (!state.customEntries) state.customEntries = [];
+        state.customEntries.push({
+            text: text,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            timestamp: Date.now()
+        });
+        
+        state.entries.push({
+            icon: '📝',
+            text: text,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            timestamp: Date.now(),
+            type: 'custom'
+        });
+        
+        input.value = '';
+        saveState();
+        renderTaskBreakdown();
+        renderEntries();
+        showToast('Entry added');
+    }
+    
+    function removeCustomEntry(index) {
+        if (!confirm('Remove this entry?')) return;
+        state.customEntries.splice(index, 1);
+        saveState();
+        renderTaskBreakdown();
+        showToast('Entry removed');
+    }
+    
+    function switchRoute() {
+        const newRoute = prompt('Enter new route number:', state.currentRoute || '');
+        if (newRoute && newRoute.trim()) {
+            const oldRoute = state.currentRoute;
+            state.currentRoute = newRoute.trim();
+            
+            state.entries.push({
+                icon: '🔄',
+                text: `Switched from Route ${oldRoute} to Route ${state.currentRoute}`,
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                timestamp: Date.now(),
+                type: 'route_change'
+            });
+            
+            saveState();
+            renderTasks();
+            renderEntries();
+            showToast(`Switched to Route ${state.currentRoute}`);
+        }
     }
     
     function renderEntries() {
@@ -830,7 +927,25 @@
     }
     
     // ==================== TASKS ====================
-    function selectTask(taskId) {
+    function selectTask(taskId, needsRoute = false) {
+        // For carriers, check if route is needed and not set
+        if (needsRoute && state.position === 'carrier' && !state.currentRoute) {
+            const route = prompt('Enter route number:');
+            if (!route || !route.trim()) {
+                showToast('Route number required');
+                return;
+            }
+            state.currentRoute = route.trim();
+            
+            state.entries.push({
+                icon: '📍',
+                text: `Set to Route ${state.currentRoute}`,
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                timestamp: Date.now(),
+                type: 'route_set'
+            });
+        }
+        
         // Save time for previous task
         if (state.currentTask && state.taskStartTime) {
             state.taskTimes[state.currentTask] = (state.taskTimes[state.currentTask] || 0) + (Date.now() - state.taskStartTime);
@@ -845,13 +960,15 @@
         const task = tasks.find(t => t.id === taskId);
         
         // Add entry
+        const routeInfo = state.currentRoute && task.needsRoute ? ` (Route ${state.currentRoute})` : '';
         state.entries.push({
             icon: '→',
-            text: `Switched to ${task.name}`,
+            text: `Switched to ${task.name}${routeInfo}`,
             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             timestamp: Date.now(),
             type: 'task',
-            taskId: taskId
+            taskId: taskId,
+            route: state.currentRoute
         });
         
         saveState();
