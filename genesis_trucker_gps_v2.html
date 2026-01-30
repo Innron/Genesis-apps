@@ -829,13 +829,13 @@
     const STORE = { profile: 'gps_profile', recent: 'gps_recent', favorites: 'gps_favorites', places: 'gps_places', trips: 'gps_trips', mapStyle: 'gps_mapStyle' };
     
     const MAP_STYLES = {
-        standard: { name: 'Standard', icon: '🗺', url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png' },
-        streets: { name: 'Streets+', icon: '🛣', url: 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png' },
-        light: { name: 'Light', icon: '☀️', url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png' },
+        standard: { name: 'Standard', icon: '🗺', url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png' },
+        clean: { name: 'Clean', icon: '✨', url: 'https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.png' },
+        light: { name: 'Light', icon: '☀️', url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png' },
         topo: { name: 'Terrain', icon: '⛰', url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png' },
         satellite: { name: 'Satellite', icon: '🛰', url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' },
         hybrid: { name: 'Hybrid', icon: '🌍', url: 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}' },
-        dark: { name: 'Dark', icon: '🌙', url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png' }
+        dark: { name: 'Dark', icon: '🌙', url: 'https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png' }
     };
     
     // Spanish translations for navigation
@@ -866,7 +866,7 @@
     let userLat = null, userLon = null, userSpeed = 0, watchId = null;
     let isNavigating = false, navHidden = true, routeSteps = [], stepIndex = 0;
     let destCoords = null, destName = '', savedRoute = null, pendingPOI = null;
-    let voiceOn = true, voiceLang = 'en', mapStyle = 'light', routeMode = 'truck';
+    let voiceOn = true, voiceLang = 'en', mapStyle = 'standard', routeMode = 'truck';
     let isTripActive = false, currentTrip = null, tripLine = null;
     let setPlaceType = null;
     

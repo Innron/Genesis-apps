@@ -240,6 +240,27 @@
             <button class="clock-btn clock-btn-out" id="clockOutBtn" onclick="clockOut()" disabled>⏹️ Clock Out</button>
         </div>
         
+        <!-- Clerk Lunch & Break Buttons (only visible for clerks) -->
+        <div id="clerkBreakSection" style="display:none;margin-top:15px;">
+            <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+                <button class="break-btn" id="lunchBtn" onclick="startLunch()" disabled style="background:#f39c12;color:#fff;border:none;padding:12px 20px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;opacity:0.5;">
+                    🍽️ Lunch
+                </button>
+                <button class="break-btn" id="break1Btn" onclick="startBreak(1)" disabled style="background:#9b59b6;color:#fff;border:none;padding:12px 20px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;opacity:0.5;">
+                    ☕ Break 1
+                </button>
+                <button class="break-btn" id="break2Btn" onclick="startBreak(2)" disabled style="background:#9b59b6;color:#fff;border:none;padding:12px 20px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;opacity:0.5;">
+                    ☕ Break 2
+                </button>
+            </div>
+            <!-- Timer display for active lunch/break -->
+            <div id="breakTimerDisplay" style="display:none;text-align:center;margin-top:15px;padding:15px;background:rgba(243,156,18,0.2);border-radius:12px;">
+                <div style="font-size:12px;color:#f39c12;margin-bottom:5px;" id="breakTimerLabel">LUNCH TIME</div>
+                <div style="font-size:32px;font-weight:700;font-family:monospace;" id="breakTimerCountdown">30:00</div>
+                <button onclick="endBreakEarly()" style="margin-top:10px;background:#e74c3c;color:#fff;border:none;padding:8px 20px;border-radius:8px;font-size:12px;cursor:pointer;">End Early</button>
+            </div>
+        </div>
+        
         <!-- Task Selection -->
         <div class="task-section" id="taskSection" style="display:none;">
             <div class="task-section-title">Current Task</div>
@@ -281,6 +302,9 @@
     <div class="bottom-nav">
         <button class="nav-btn active" onclick="showPanel('main')">
             <span class="nav-btn-icon">⏱️</span>Clock
+        </button>
+        <button class="nav-btn" onclick="showPanel('routes')">
+            <span class="nav-btn-icon">🔍</span>Routes
         </button>
         <button class="nav-btn" onclick="showPanel('packages')">
             <span class="nav-btn-icon">📦</span>Packages
@@ -589,6 +613,16 @@
                     <input type="number" class="setting-select" id="hourlyRate" value="20" style="width:80px;" onchange="saveSettings()">
                 </div>
             </div>
+            <div class="setting-group" id="clerkLunchSettings" style="display:none;">
+                <div class="setting-group-title">Lunch Duration (Clerks)</div>
+                <div class="setting-item">
+                    <span class="setting-label">Lunch Break Length</span>
+                    <select class="setting-select" id="lunchDuration" onchange="saveSettings()">
+                        <option value="30">30 Minutes</option>
+                        <option value="60">1 Hour</option>
+                    </select>
+                </div>
+            </div>
             <div class="setting-group">
                 <div class="setting-group-title">Data</div>
                 <div class="setting-item" onclick="exportData()">
@@ -747,10 +781,18 @@
         customRoutes: [], // Custom routes added by user
         customDeductions: [], // Custom pay deductions
         customEntries: [], // Custom entries for 204B/Supervisors
+        // Clerk lunch/break tracking
+        lunchTaken: false,
+        lunchStartTime: null,
+        lunchTotalMs: 0,
+        break1Taken: false,
+        break2Taken: false,
+        activeBreakType: null, // 'lunch', 'break1', 'break2'
         settings: {
             geofenceEnabled: 'on',
             geofenceRadius: '200',
             hourlyRate: 20,
+            lunchDuration: 60, // 30 or 60 minutes
             saveToLibrary: false // Save clean images to photo library
         }
     };
@@ -759,6 +801,7 @@
     let geoWatchId = null;
     let officeCoords = null;
     let cvReady = false;
+    let breakTimerInterval = null;
     
     function onOpenCvReady() {
         cvReady = true;
@@ -851,6 +894,13 @@
         const clockOutBtn = document.getElementById('clockOutBtn');
         const taskSection = document.getElementById('taskSection');
         const breakdownSection = document.getElementById('breakdownSection');
+        const clerkBreakSection = document.getElementById('clerkBreakSection');
+        const clerkLunchSettings = document.getElementById('clerkLunchSettings');
+        
+        // Show/hide clerk-specific elements
+        const isClerk = state.position === 'clerk';
+        clerkBreakSection.style.display = isClerk ? 'block' : 'none';
+        clerkLunchSettings.style.display = isClerk ? 'block' : 'none';
         
         if (state.isClockedIn) {
             statusEl.textContent = 'Clocked In';
@@ -860,6 +910,11 @@
             taskSection.style.display = 'block';
             breakdownSection.style.display = 'block';
             startTimer();
+            
+            // Enable clerk break buttons if clocked in
+            if (isClerk) {
+                updateClerkBreakButtons();
+            }
         } else {
             statusEl.textContent = 'Clocked Out';
             statusEl.className = 'timer-status clocked-out';
@@ -869,6 +924,16 @@
             breakdownSection.style.display = 'none';
             document.getElementById('mainTimer').textContent = '00:00:00';
             stopTimer();
+            
+            // Disable clerk break buttons
+            if (isClerk) {
+                document.getElementById('lunchBtn').disabled = true;
+                document.getElementById('lunchBtn').style.opacity = '0.5';
+                document.getElementById('break1Btn').disabled = true;
+                document.getElementById('break1Btn').style.opacity = '0.5';
+                document.getElementById('break2Btn').disabled = true;
+                document.getElementById('break2Btn').style.opacity = '0.5';
+            }
         }
         
         // Position & Office
@@ -882,11 +947,51 @@
             document.getElementById('geofenceEnabled').value = state.settings.geofenceEnabled || 'on';
             document.getElementById('geofenceRadius').value = state.settings.geofenceRadius || '200';
             document.getElementById('hourlyRate').value = state.settings.hourlyRate || 20;
+            document.getElementById('lunchDuration').value = state.settings.lunchDuration || 60;
         }
         
         renderTaskBreakdown();
         renderEntries();
         renderGreenCardImages();
+    }
+    
+    function updateClerkBreakButtons() {
+        const lunchBtn = document.getElementById('lunchBtn');
+        const break1Btn = document.getElementById('break1Btn');
+        const break2Btn = document.getElementById('break2Btn');
+        
+        // Lunch button
+        if (state.lunchTaken || state.activeBreakType) {
+            lunchBtn.disabled = true;
+            lunchBtn.style.opacity = '0.5';
+            if (state.lunchTaken) lunchBtn.textContent = '✓ Lunch Done';
+        } else {
+            lunchBtn.disabled = false;
+            lunchBtn.style.opacity = '1';
+            lunchBtn.textContent = '🍽️ Lunch';
+        }
+        
+        // Break 1 button
+        if (state.break1Taken || state.activeBreakType) {
+            break1Btn.disabled = true;
+            break1Btn.style.opacity = '0.5';
+            if (state.break1Taken) break1Btn.textContent = '✓ Break 1 Done';
+        } else {
+            break1Btn.disabled = false;
+            break1Btn.style.opacity = '1';
+            break1Btn.textContent = '☕ Break 1';
+        }
+        
+        // Break 2 button
+        if (state.break2Taken || state.activeBreakType) {
+            break2Btn.disabled = true;
+            break2Btn.style.opacity = '0.5';
+            if (state.break2Taken) break2Btn.textContent = '✓ Break 2 Done';
+        } else {
+            break2Btn.disabled = false;
+            break2Btn.style.opacity = '1';
+            break2Btn.textContent = '☕ Break 2';
+        }
     }
     
     function renderTasks() {
@@ -1122,6 +1227,12 @@
     function clockOut() {
         if (!state.isClockedIn) return;
         
+        // Stop any active break timer
+        if (breakTimerInterval) {
+            clearInterval(breakTimerInterval);
+            breakTimerInterval = null;
+        }
+        
         // Save current task time
         if (state.currentTask && state.taskStartTime) {
             state.taskTimes[state.currentTask] = (state.taskTimes[state.currentTask] || 0) + (Date.now() - state.taskStartTime);
@@ -1151,6 +1262,7 @@
             clockInOriginal: clockInEntry && clockInEntry.originalTimestamp ? clockInEntry.originalTimestamp : null,
             clockOut: now.getTime(),
             totalTime: totalTime,
+            lunchTime: state.lunchTotalMs || 0, // Track lunch time for pay calculation
             entries: [...state.entries],
             taskTimes: { ...state.taskTimes },
             greenCard: state.greenCard,
@@ -1164,10 +1276,166 @@
         state.currentTask = null;
         state.taskStartTime = null;
         state.gpsArrival = null;
+        // Reset lunch/break for next shift
+        state.lunchTaken = false;
+        state.lunchStartTime = null;
+        state.lunchTotalMs = 0;
+        state.break1Taken = false;
+        state.break2Taken = false;
+        state.activeBreakType = null;
         
         saveState();
         updateUI();
         showToast('Clocked out - Total: ' + formatTimeShort(totalTime));
+    }
+    
+    // ==================== CLERK LUNCH & BREAKS ====================
+    function startLunch() {
+        if (state.lunchTaken || state.activeBreakType) return;
+        
+        const duration = parseInt(state.settings.lunchDuration) || 60;
+        state.activeBreakType = 'lunch';
+        state.lunchStartTime = Date.now();
+        
+        // Add entry
+        state.entries.push({
+            icon: '🍽️',
+            text: `Lunch Started (${duration} min)`,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            timestamp: Date.now(),
+            type: 'lunch_start'
+        });
+        
+        showBreakTimer('LUNCH TIME', duration * 60);
+        saveState();
+        updateClerkBreakButtons();
+        showToast(`Lunch started - ${duration} minutes`);
+    }
+    
+    function startBreak(breakNum) {
+        if ((breakNum === 1 && state.break1Taken) || (breakNum === 2 && state.break2Taken) || state.activeBreakType) return;
+        
+        state.activeBreakType = `break${breakNum}`;
+        
+        // Add entry
+        state.entries.push({
+            icon: '☕',
+            text: `Break ${breakNum} Started (15 min)`,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            timestamp: Date.now(),
+            type: `break${breakNum}_start`
+        });
+        
+        showBreakTimer(`BREAK ${breakNum}`, 15 * 60);
+        saveState();
+        updateClerkBreakButtons();
+        showToast(`Break ${breakNum} started - 15 minutes`);
+    }
+    
+    function showBreakTimer(label, totalSeconds) {
+        const display = document.getElementById('breakTimerDisplay');
+        const labelEl = document.getElementById('breakTimerLabel');
+        const countdownEl = document.getElementById('breakTimerCountdown');
+        
+        display.style.display = 'block';
+        labelEl.textContent = label;
+        
+        // Set color based on type
+        if (label.includes('LUNCH')) {
+            display.style.background = 'rgba(243,156,18,0.2)';
+            labelEl.style.color = '#f39c12';
+        } else {
+            display.style.background = 'rgba(155,89,182,0.2)';
+            labelEl.style.color = '#9b59b6';
+        }
+        
+        let remaining = totalSeconds;
+        
+        function updateCountdown() {
+            const mins = Math.floor(remaining / 60);
+            const secs = remaining % 60;
+            countdownEl.textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            
+            if (remaining <= 0) {
+                endBreakTimer();
+            } else {
+                remaining--;
+            }
+        }
+        
+        updateCountdown();
+        breakTimerInterval = setInterval(updateCountdown, 1000);
+    }
+    
+    function endBreakTimer() {
+        if (breakTimerInterval) {
+            clearInterval(breakTimerInterval);
+            breakTimerInterval = null;
+        }
+        
+        const breakType = state.activeBreakType;
+        const now = new Date();
+        
+        if (breakType === 'lunch') {
+            state.lunchTaken = true;
+            state.lunchTotalMs = Date.now() - state.lunchStartTime;
+            
+            state.entries.push({
+                icon: '🍽️',
+                text: `Lunch Ended`,
+                time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                timestamp: Date.now(),
+                type: 'lunch_end'
+            });
+            
+            showToast('Lunch break ended!');
+            
+            // Vibrate/alert
+            if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+            
+        } else if (breakType === 'break1') {
+            state.break1Taken = true;
+            
+            state.entries.push({
+                icon: '☕',
+                text: `Break 1 Ended`,
+                time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                timestamp: Date.now(),
+                type: 'break1_end'
+            });
+            
+            showToast('Break 1 ended!');
+            if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+            
+        } else if (breakType === 'break2') {
+            state.break2Taken = true;
+            
+            state.entries.push({
+                icon: '☕',
+                text: `Break 2 Ended`,
+                time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                timestamp: Date.now(),
+                type: 'break2_end'
+            });
+            
+            showToast('Break 2 ended!');
+            if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+        }
+        
+        state.activeBreakType = null;
+        document.getElementById('breakTimerDisplay').style.display = 'none';
+        
+        saveState();
+        updateClerkBreakButtons();
+        renderEntries();
+    }
+    
+    function endBreakEarly() {
+        if (!state.activeBreakType) return;
+        
+        if (confirm('End break early?')) {
+            endBreakTimer();
+        }
     }
     
     // ==================== TASKS ====================
@@ -1982,20 +2250,33 @@
         // Calculate hours from history in current pay period (last 2 weeks)
         const twoWeeksAgo = Date.now() - (14 * 24 * 60 * 60 * 1000);
         let totalMs = 0;
+        let totalLunchMs = 0;
         
         state.history.forEach(h => {
             if (h.clockIn > twoWeeksAgo) {
                 totalMs += h.totalTime || 0;
+                // Subtract lunch time for clerks (lunch is unpaid)
+                if (h.position === 'clerk' && h.lunchTime) {
+                    totalLunchMs += h.lunchTime;
+                }
             }
         });
         
-        const hours = totalMs / (1000 * 60 * 60);
+        // Paid time = total time minus lunch time
+        const paidMs = totalMs - totalLunchMs;
+        const hours = paidMs / (1000 * 60 * 60);
         const rate = state.settings.hourlyRate || 20;
         const estimate = hours * rate;
         
         document.getElementById('payPeriodHours').textContent = hours.toFixed(1);
         document.getElementById('payEstimate').textContent = '$' + estimate.toFixed(2);
         document.getElementById('payHourlyRate').value = rate;
+        
+        // Show lunch time deducted if any
+        if (totalLunchMs > 0) {
+            const lunchHours = (totalLunchMs / (1000 * 60 * 60)).toFixed(1);
+            document.getElementById('payPeriodHours').textContent = hours.toFixed(1) + ` (${lunchHours}h lunch deducted)`;
+        }
     }
     
     function addPreviousHours() {
@@ -2136,6 +2417,7 @@
         state.settings.geofenceEnabled = document.getElementById('geofenceEnabled').value;
         state.settings.geofenceRadius = document.getElementById('geofenceRadius').value;
         state.settings.hourlyRate = parseFloat(document.getElementById('hourlyRate').value) || 20;
+        state.settings.lunchDuration = parseInt(document.getElementById('lunchDuration').value) || 60;
         saveState();
         
         // Restart geofence if enabled
