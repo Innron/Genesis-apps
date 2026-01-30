@@ -36,18 +36,18 @@
         
         .tabs {
             display: flex;
-            gap: 10px;
+            gap: 8px;
             margin-bottom: 20px;
         }
         
         .tab {
             flex: 1;
-            padding: 15px;
+            padding: 12px 8px;
             background: rgba(255,255,255,0.1);
             border: none;
             border-radius: 12px;
             color: #fff;
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s;
@@ -126,6 +126,11 @@
         
         .btn-info {
             background: linear-gradient(135deg, #0984e3 0%, #74b9ff 100%);
+            color: white;
+        }
+        
+        .btn-purple {
+            background: linear-gradient(135deg, #6c5ce7 0%, #a29bfe 100%);
             color: white;
         }
         
@@ -269,9 +274,80 @@
             font-size: 14px;
             line-height: 1.6;
             color: #ccc;
+            text-align: left;
+            white-space: pre-wrap;
         }
         
         .hidden { display: none !important; }
+        
+        /* Quick Share Section */
+        .quick-share-card {
+            background: linear-gradient(135deg, rgba(108, 92, 231, 0.2) 0%, rgba(162, 155, 254, 0.2) 100%);
+            border: 2px solid #6c5ce7;
+        }
+        
+        .quick-share-card .card-title {
+            color: #a29bfe;
+        }
+        
+        .supervisor-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #6c5ce7 0%, #a29bfe 100%);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+            margin-left: 10px;
+        }
+        
+        .direct-link-box {
+            background: rgba(0,0,0,0.3);
+            border-radius: 12px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        
+        .link-url {
+            font-family: monospace;
+            font-size: 12px;
+            color: #a29bfe;
+            word-break: break-all;
+            margin-bottom: 10px;
+        }
+        
+        .quick-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .quick-actions button {
+            flex: 1;
+        }
+        
+        /* App Cards in Apps Tab */
+        .app-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .no-code-badge {
+            background: linear-gradient(135deg, #6c5ce7 0%, #a29bfe 100%);
+            padding: 4px 10px;
+            border-radius: 15px;
+            font-size: 10px;
+            font-weight: 700;
+        }
+        
+        .code-required-badge {
+            background: rgba(255,255,255,0.2);
+            padding: 4px 10px;
+            border-radius: 15px;
+            font-size: 10px;
+            font-weight: 600;
+            color: #aaa;
+        }
     </style>
 </head>
 <body>
@@ -279,11 +355,12 @@
         <div class="header">
             <h1>🚀 Genesis App Distributor</h1>
             <p>Generate codes & share app links</p>
-            <div style="margin-top:8px;font-size:11px;opacity:0.7;">v2.0 - Updated Apps</div>
+            <div style="margin-top:8px;font-size:11px;opacity:0.7;">v3.0 - Route Lookup Added</div>
         </div>
         
         <div class="tabs">
             <button class="tab active" onclick="showTab('generate')">🎫 Generate</button>
+            <button class="tab" onclick="showTab('quick')">⚡ Quick Share</button>
             <button class="tab" onclick="showTab('manage')">📋 Manage</button>
             <button class="tab" onclick="showTab('apps')">📱 Apps</button>
         </div>
@@ -291,7 +368,7 @@
         <!-- GENERATE TAB -->
         <div id="generateTab" class="panel active">
             <div class="card">
-                <div class="card-title">📲 Select App</div>
+                <div class="card-title">📲 Select App (Code Required)</div>
                 <div class="app-selector" style="flex-wrap:wrap;">
                     <div class="app-option selected" onclick="selectApp('postal')" id="app-postal" style="width:calc(50% - 5px);">
                         <div class="app-icon">📫</div>
@@ -340,6 +417,37 @@
             </div>
         </div>
         
+        <!-- QUICK SHARE TAB (No Code Required) -->
+        <div id="quickTab" class="panel">
+            <div class="card quick-share-card">
+                <div class="card-title">
+                    📬 Route Lookup
+                    <span class="supervisor-badge">SUPERVISORS</span>
+                </div>
+                <p style="color: #ccc; margin-bottom: 15px; font-size: 14px;">
+                    Mansfield ZIP 76063 route finder. Search any address to find the carrier route.
+                </p>
+                <p style="color: #a29bfe; font-size: 12px; margin-bottom: 15px;">
+                    ✨ No access code needed - direct link for supervisors
+                </p>
+                
+                <div class="direct-link-box">
+                    <div class="link-url" id="routeLookupUrl">https://innron.github.io/Genesis-apps/genesis_route_lookup.html</div>
+                    <div class="quick-actions">
+                        <button class="btn btn-info" onclick="copyDirectLink('routelookup')" style="margin-top:0;">📋 Copy Link</button>
+                        <button class="btn btn-purple" onclick="shareDirectLink('routelookup')" style="margin-top:0;">📱 Text to Supervisor</button>
+                    </div>
+                </div>
+                
+                <div id="routeLookupPreview" class="message-preview" style="display:none;"></div>
+            </div>
+            
+            <div style="text-align:center; color:#888; font-size:12px; margin-top:20px; padding: 15px;">
+                💡 Quick Share apps don't require invite codes.<br>
+                Just copy the link and text it directly!
+            </div>
+        </div>
+        
         <!-- MANAGE TAB -->
         <div id="manageTab" class="panel">
             <div class="stats-grid">
@@ -368,22 +476,53 @@
         
         <!-- APPS TAB -->
         <div id="appsTab" class="panel">
+            <!-- Direct Link Apps (No Code) -->
+            <div class="card quick-share-card">
+                <div class="app-card-header">
+                    <div class="card-title" style="margin-bottom:0;">📬 Route Lookup</div>
+                    <span class="no-code-badge">NO CODE</span>
+                </div>
+                <p style="color: #ccc; margin-bottom: 15px; font-size: 14px;">
+                    Supervisor route finder for Mansfield 76063
+                </p>
+                <button class="btn btn-purple" onclick="shareDirectLink('routelookup')">📱 Share Direct Link</button>
+            </div>
+            
+            <!-- Code Required Apps -->
             <div class="card">
-                <div class="card-title">📫 Postal Clock App</div>
+                <div class="app-card-header">
+                    <div class="card-title" style="margin-bottom:0;">📫 Postal Clock</div>
+                    <span class="code-required-badge">CODE REQUIRED</span>
+                </div>
                 <p style="color: #aaa; margin-bottom: 15px;">Time tracking for USPS carriers & clerks</p>
-                <button class="btn btn-primary" onclick="downloadApp('postal')">📥 Download App</button>
+                <button class="btn btn-primary" onclick="goToGenerate('postal')">🎫 Generate Code</button>
             </div>
             
             <div class="card">
-                <div class="card-title">⏰ Time Tracker App</div>
+                <div class="app-card-header">
+                    <div class="card-title" style="margin-bottom:0;">📮⭐ Postal Clock Pro</div>
+                    <span class="code-required-badge">CODE REQUIRED</span>
+                </div>
+                <p style="color: #aaa; margin-bottom: 15px;">Advanced features for trusted users</p>
+                <button class="btn btn-primary" onclick="goToGenerate('postalpro')">🎫 Generate Code</button>
+            </div>
+            
+            <div class="card">
+                <div class="app-card-header">
+                    <div class="card-title" style="margin-bottom:0;">⏰ Time Tracker</div>
+                    <span class="code-required-badge">CODE REQUIRED</span>
+                </div>
                 <p style="color: #aaa; margin-bottom: 15px;">General purpose time tracking</p>
-                <button class="btn btn-primary" onclick="downloadApp('time')">📥 Download App</button>
+                <button class="btn btn-primary" onclick="goToGenerate('time')">🎫 Generate Code</button>
             </div>
             
             <div class="card">
-                <div class="card-title">🚛 Trucker GPS App (Punjabi)</div>
+                <div class="app-card-header">
+                    <div class="card-title" style="margin-bottom:0;">🚛 Trucker GPS</div>
+                    <span class="code-required-badge">CODE REQUIRED</span>
+                </div>
                 <p style="color: #aaa; margin-bottom: 15px;">GPS navigation with Punjabi voice + document scanner</p>
-                <button class="btn btn-primary" onclick="downloadApp('trucker')">📥 Download App</button>
+                <button class="btn btn-primary" onclick="goToGenerate('trucker')">🎫 Generate Code</button>
             </div>
         </div>
     </div>
@@ -415,6 +554,15 @@
             'trucker': 'https://innron.github.io/Genesis-apps/genesis_trucker_gps_v2.html'
         };
         
+        // Direct link apps (no code required)
+        const directLinks = {
+            'routelookup': {
+                name: 'Genesis Route Lookup',
+                url: 'https://innron.github.io/Genesis-apps/genesis_route_lookup.html',
+                description: 'Mansfield ZIP 76063 route finder'
+            }
+        };
+        
         function showTab(tab) {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
@@ -432,6 +580,17 @@
             selectedApp = app;
             document.querySelectorAll('.app-option').forEach(o => o.classList.remove('selected'));
             document.getElementById('app-' + app).classList.add('selected');
+        }
+        
+        function goToGenerate(app) {
+            // Switch to generate tab and select the app
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            
+            document.querySelector('.tab').classList.add('active');
+            document.getElementById('generateTab').classList.add('active');
+            
+            selectApp(app);
         }
         
         function generateCode() {
@@ -490,6 +649,36 @@
             if (navigator.share) {
                 navigator.share({
                     title: appName + ' Invite',
+                    text: message
+                });
+            } else {
+                window.open('sms:?body=' + encodeURIComponent(message));
+            }
+        }
+        
+        // Direct Link Functions (No Code Required)
+        function copyDirectLink(appKey) {
+            const app = directLinks[appKey];
+            navigator.clipboard.writeText(app.url).then(() => {
+                alert('✅ Link copied!\n\n' + app.url);
+            });
+        }
+        
+        function shareDirectLink(appKey) {
+            const app = directLinks[appKey];
+            
+            const message = `📬 ${app.name}\n\n${app.description}\n\n🔗 Open: ${app.url}\n\n📌 Add to home screen for quick access!`;
+            
+            // Show preview
+            const previewEl = document.getElementById(appKey === 'routelookup' ? 'routeLookupPreview' : null);
+            if (previewEl) {
+                previewEl.textContent = message;
+                previewEl.style.display = 'block';
+            }
+            
+            if (navigator.share) {
+                navigator.share({
+                    title: app.name,
                     text: message
                 });
             } else {
@@ -588,10 +777,6 @@
                     renderCodes();
                 }
             }
-        }
-        
-        function downloadApp(app) {
-            alert(`📱 ${appNames[app]}\n\nThis app file needs to be shared separately.\n\nUse the Generate tab to create invite codes for users!`);
         }
         
         // Expose for validation from other apps

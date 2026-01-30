@@ -778,6 +778,7 @@
         greenCard: null, // Legacy single image
         greenCardImages: [], // New: array of images [{id, image, timestamp}]
         gpsArrival: null,
+        lastClockOut: null, // Track when user clocked out to prevent immediate re-prompt
         customRoutes: [], // Custom routes added by user
         customDeductions: [], // Custom pay deductions
         customEntries: [], // Custom entries for 204B/Supervisors
@@ -816,12 +817,50 @@
         updateUI();
         startGeofence();
         
+        // IMPORTANT: Restore any active lunch/break timer
+        restoreActiveBreakTimer();
+        
         // Update date every minute
         setInterval(updateDate, 60000);
         
         // Persist state every 5 seconds
         setInterval(saveState, 5000);
     });
+    
+    function restoreActiveBreakTimer() {
+        // If there's an active break/lunch, restore the timer
+        if (state.activeBreakType && state.lunchStartTime) {
+            const now = Date.now();
+            const elapsed = Math.floor((now - state.lunchStartTime) / 1000);
+            
+            let totalDuration;
+            let label;
+            
+            if (state.activeBreakType === 'lunch') {
+                totalDuration = (parseInt(state.settings.lunchDuration) || 60) * 60;
+                label = 'LUNCH TIME';
+            } else if (state.activeBreakType === 'break1') {
+                totalDuration = 15 * 60;
+                label = 'BREAK 1';
+            } else if (state.activeBreakType === 'break2') {
+                totalDuration = 15 * 60;
+                label = 'BREAK 2';
+            }
+            
+            const remaining = totalDuration - elapsed;
+            
+            if (remaining > 0) {
+                // Timer still has time - restore it
+                showBreakTimerWithRemaining(label, remaining);
+                updateClerkBreakButtons();
+                console.log(`Restored ${state.activeBreakType} timer with ${Math.floor(remaining/60)}:${(remaining%60).toString().padStart(2,'0')} remaining`);
+            } else {
+                // Timer expired while app was closed - end it now
+                console.log(`${state.activeBreakType} timer expired while app was closed - ending now`);
+                endBreakTimer();
+            }
+        }
+    }
     
     function loadState() {
         const saved = localStorage.getItem(STORE_KEY);
@@ -1199,6 +1238,14 @@
         state.taskTimes = {};
         state.entries = [];
         
+        // Reset clerk lunch/break states for new day
+        state.lunchTaken = false;
+        state.lunchStartTime = null;
+        state.lunchTotalMs = 0;
+        state.break1Taken = false;
+        state.break2Taken = false;
+        state.activeBreakType = null;
+        
         // Add GPS arrival if available
         if (state.gpsArrival) {
             state.entries.push({
@@ -1276,6 +1323,7 @@
         state.currentTask = null;
         state.taskStartTime = null;
         state.gpsArrival = null;
+        state.lastClockOut = Date.now(); // Track when we clocked out to prevent immediate re-prompt
         // Reset lunch/break for next shift
         state.lunchTaken = false;
         state.lunchStartTime = null;
@@ -1316,6 +1364,7 @@
         if ((breakNum === 1 && state.break1Taken) || (breakNum === 2 && state.break2Taken) || state.activeBreakType) return;
         
         state.activeBreakType = `break${breakNum}`;
+        state.lunchStartTime = Date.now(); // Use same field for all break timers
         
         // Add entry
         state.entries.push({
@@ -1330,6 +1379,42 @@
         saveState();
         updateClerkBreakButtons();
         showToast(`Break ${breakNum} started - 15 minutes`);
+    }
+    
+    function showBreakTimerWithRemaining(label, remainingSeconds) {
+        // Same as showBreakTimer but starts with remaining time (for restore)
+        const display = document.getElementById('breakTimerDisplay');
+        const labelEl = document.getElementById('breakTimerLabel');
+        const countdownEl = document.getElementById('breakTimerCountdown');
+        
+        display.style.display = 'block';
+        labelEl.textContent = label;
+        
+        // Set color based on type
+        if (label.includes('LUNCH')) {
+            display.style.background = 'rgba(243,156,18,0.2)';
+            labelEl.style.color = '#f39c12';
+        } else {
+            display.style.background = 'rgba(155,89,182,0.2)';
+            labelEl.style.color = '#9b59b6';
+        }
+        
+        let remaining = remainingSeconds;
+        
+        function updateCountdown() {
+            const mins = Math.floor(remaining / 60);
+            const secs = remaining % 60;
+            countdownEl.textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            
+            if (remaining <= 0) {
+                endBreakTimer();
+            } else {
+                remaining--;
+            }
+        }
+        
+        updateCountdown();
+        breakTimerInterval = setInterval(updateCountdown, 1000);
     }
     
     function showBreakTimer(label, totalSeconds) {
@@ -1423,6 +1508,7 @@
         }
         
         state.activeBreakType = null;
+        state.lunchStartTime = null; // Clear start time
         document.getElementById('breakTimerDisplay').style.display = 'none';
         
         saveState();
@@ -2155,6 +2241,17 @@
         if (dist <= radiusMeters) {
             // Arrived at office
             if (!state.isClockedIn && !state.gpsArrival) {
+                // Check if user clocked out today - don't prompt again same day
+                if (state.lastClockOut) {
+                    const clockOutDate = new Date(state.lastClockOut).toDateString();
+                    const today = new Date().toDateString();
+                    if (clockOutDate === today) {
+                        // Already worked today, don't prompt to clock back in
+                        console.log('Geofence: Already clocked out today, skipping prompt');
+                        return;
+                    }
+                }
+                
                 state.gpsArrival = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                 showGeoAlert('arrive');
             }
