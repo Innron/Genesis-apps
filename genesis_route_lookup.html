@@ -38,6 +38,18 @@
         .result-type { font-size: 18px; opacity: 0.9; margin-top: 5px; }
         .result-address { font-size: 14px; opacity: 0.8; margin-top: 10px; }
         
+        /* Auto-populate results list */
+        .results-list { margin-top: 15px; max-height: 400px; overflow-y: auto; }
+        .result-item { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); border-radius: 12px; padding: 15px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; animation: fadeIn 0.2s ease; }
+        .result-item.city { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .result-item.rural { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+        .result-info { flex: 1; }
+        .result-street { font-size: 16px; font-weight: 600; }
+        .result-range { font-size: 13px; opacity: 0.9; margin-top: 3px; }
+        .result-route-badge { font-size: 28px; font-weight: 700; margin-left: 15px; }
+        .result-type-label { font-size: 11px; opacity: 0.8; text-align: right; }
+        .search-hint { font-size: 12px; color: #888; margin-top: 10px; text-align: center; }
+        
         .no-result { background: #ff6b6b; border-radius: 16px; padding: 20px; margin-top: 20px; text-align: center; display: none; }
         .no-result.show { display: block; animation: fadeIn 0.3s ease; }
         
@@ -65,8 +77,8 @@
         .header { position: relative; }
         
         .route-input-wrapper { display: flex; gap: 10px; }
-        .route-prefix { width: 80px; padding: 16px; font-size: 18px; border: 2px solid #333; border-radius: 12px; background: #0f0f23; color: #fff; text-align: center; }
-        .route-number { flex: 1; }
+        .route-prefix { width: 70px; min-width: 70px; max-width: 70px; padding: 16px 8px; font-size: 18px; border: 2px solid #333; border-radius: 12px; background: #0f0f23; color: #fff; text-align: center; }
+        .route-number { flex: 1; min-width: 0; }
         
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
@@ -85,20 +97,13 @@
                 <div class="section-title">🔍 Search Route</div>
                 <div class="input-group">
                     <label>Street Address</label>
-                    <input type="text" id="addressInput" placeholder="e.g., 1234 Main St" autocomplete="off">
-                </div>
-                <button class="btn btn-primary" onclick="searchRoute()">Find Route</button>
-                
-                <div id="resultCard" class="result-card">
-                    <div class="result-route" id="resultRoute"></div>
-                    <div class="result-type" id="resultType"></div>
-                    <div class="result-address" id="resultAddress"></div>
+                    <input type="text" id="addressInput" placeholder="e.g., 1234 Main St" autocomplete="off" oninput="autoSearch()">
                 </div>
                 
-                <div id="noResult" class="no-result">
-                    <strong>No Route Found</strong>
-                    <p style="margin-top:10px;font-size:14px;">Address not in database. You can add it manually.</p>
-                </div>
+                <!-- Results appear here as you type -->
+                <div id="resultsContainer"></div>
+                
+                <div class="search-hint">Start typing to see matching routes</div>
             </div>
             
             <div class="stats">
@@ -211,42 +216,57 @@
             return { number: null, street: normalized };
         }
         
-        function searchRoute() {
+        function autoSearch() {
             const input = document.getElementById('addressInput').value.trim();
-            if (!input) return;
+            const container = document.getElementById('resultsContainer');
+            
+            if (input.length < 2) {
+                container.innerHTML = '';
+                return;
+            }
             
             const parsed = parseAddress(input);
             const allRoutes = getAllRoutes();
             
+            // Find matching routes
             let matches = allRoutes.filter(r => {
                 const routeStreet = normalizeStreet(r.n);
-                return routeStreet === parsed.street || 
-                       routeStreet.includes(parsed.street) || 
+                return routeStreet.includes(parsed.street) || 
                        parsed.street.includes(routeStreet);
             });
             
+            // If we have a house number, filter to exact range matches first
             if (parsed.number && matches.length > 0) {
-                const exactMatch = matches.find(r => parsed.number >= r.f && parsed.number <= r.l);
-                if (exactMatch) matches = [exactMatch];
+                const exactMatches = matches.filter(r => parsed.number >= r.f && parsed.number <= r.l);
+                if (exactMatches.length > 0) {
+                    matches = exactMatches;
+                }
             }
             
-            const resultCard = document.getElementById('resultCard');
-            const noResult = document.getElementById('noResult');
+            // Limit results
+            matches = matches.slice(0, 10);
             
-            if (matches.length > 0) {
-                const route = matches[0];
-                const routeType = route.t === 'city' ? 'City Route' : 'Rural Route';
-                
-                document.getElementById('resultRoute').textContent = route.r;
-                document.getElementById('resultType').textContent = routeType;
-                document.getElementById('resultAddress').textContent = route.n + ' (' + route.f + '-' + route.l + ')';
-                
-                resultCard.className = 'result-card show ' + route.t;
-                noResult.className = 'no-result';
-            } else {
-                resultCard.className = 'result-card';
-                noResult.className = 'no-result show';
+            if (matches.length === 0) {
+                container.innerHTML = '<div style="background:rgba(255,107,107,0.3);border-radius:12px;padding:15px;text-align:center;color:#fff;margin-top:15px;"><strong>No routes found</strong><br><span style="font-size:13px;opacity:0.8;">Try a different address or add it manually</span></div>';
+                return;
             }
+            
+            // Render results
+            container.innerHTML = '<div class="results-list">' + matches.map(route => {
+                const typeLabel = route.t === 'city' ? 'City' : 'Rural';
+                return `
+                    <div class="result-item ${route.t}">
+                        <div class="result-info">
+                            <div class="result-street">${route.n}</div>
+                            <div class="result-range">${route.f} - ${route.l}</div>
+                        </div>
+                        <div style="text-align:right;">
+                            <div class="result-route-badge">${route.r}</div>
+                            <div class="result-type-label">${typeLabel}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('') + '</div>';
         }
         
         function showAddPage() {
@@ -345,11 +365,6 @@
             
             document.getElementById('entryCount').textContent = ROUTE_DATA.length + userRoutes.length;
         }
-        
-        // Enter key to search
-        document.getElementById('addressInput').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') searchRoute();
-        });
         
         // Initial render
         renderAddedRoutes();
