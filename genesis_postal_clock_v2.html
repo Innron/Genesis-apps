@@ -267,6 +267,18 @@
             <div class="task-grid" id="taskGrid"></div>
         </div>
         
+        <!-- Carrier Extra Buttons (Second Trip & Manual Lunch) -->
+        <div id="carrierExtraSection" style="display:none;margin-top:15px;">
+            <div style="display:flex;gap:10px;justify-content:center;">
+                <button id="secondTripBtn" onclick="startSecondTrip()" style="background:#3498db;color:#fff;border:none;padding:12px 20px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;">
+                    🔄 Second Trip
+                </button>
+                <button id="carrierLunchBtn" onclick="deductCarrierLunch()" style="background:#e67e22;color:#fff;border:none;padding:12px 20px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;">
+                    🍽️ Deduct Lunch
+                </button>
+            </div>
+        </div>
+        
         <!-- Task Breakdown -->
         <div class="breakdown-section" id="breakdownSection" style="display:none;">
             <div class="breakdown-title">
@@ -736,6 +748,11 @@
         lastClockOut: null, // Track when user clocked out to prevent immediate re-prompt
         customEntries: [],
         customDeductions: [],
+        // Carrier lunch deduction tracking
+        carrierLunchDeducted: 0, // Total minutes deducted for unpaid lunch
+        // Second trip tracking
+        secondTripRoute: null, // Route number for second trip
+        secondTripStartTime: null, // When second trip started
         // Clerk lunch/break tracking
         lunchTaken: false,
         lunchStartTime: null,
@@ -930,9 +947,11 @@
         const breakdownSection = document.getElementById('breakdownSection');
         const clerkBreakSection = document.getElementById('clerkBreakSection');
         const clerkLunchSettings = document.getElementById('clerkLunchSettings');
+        const carrierExtraSection = document.getElementById('carrierExtraSection');
         
-        // Show/hide clerk-specific elements
+        // Show/hide position-specific elements
         const isClerk = state.position === 'clerk';
+        const isCarrier = state.position === 'carrier';
         clerkBreakSection.style.display = isClerk ? 'block' : 'none';
         clerkLunchSettings.style.display = isClerk ? 'block' : 'none';
         
@@ -943,6 +962,10 @@
             clockOutBtn.disabled = false;
             taskSection.style.display = 'block';
             breakdownSection.style.display = 'block';
+            
+            // Show carrier extra buttons when clocked in as carrier
+            carrierExtraSection.style.display = isCarrier ? 'block' : 'none';
+            
             startTimer();
             
             // Enable clerk break buttons if clocked in
@@ -956,6 +979,7 @@
             clockOutBtn.disabled = true;
             taskSection.style.display = 'none';
             breakdownSection.style.display = 'none';
+            carrierExtraSection.style.display = 'none';
             document.getElementById('mainTimer').textContent = '00:00:00';
             stopTimer();
             
@@ -1105,8 +1129,21 @@
             }
         });
         
+        // Show second trip if active (for carriers)
+        if (state.position === 'carrier' && state.secondTripRoute && state.secondTripStartTime) {
+            const secondTripMs = Date.now() - state.secondTripStartTime;
+            html += `<div class="breakdown-item" style="background:rgba(52,152,219,0.1);"><span>🔄 Second Trip (${state.secondTripRoute})</span><span class="breakdown-time" style="color:#3498db;">${formatTime(secondTripMs)}</span></div>`;
+        }
+        
+        // Show carrier lunch deduction if any (for carriers)
+        if (state.position === 'carrier' && state.carrierLunchDeducted > 0) {
+            const lunchMs = state.carrierLunchDeducted * 60 * 1000;
+            totalMs -= lunchMs; // Deduct from total
+            html += `<div class="breakdown-item" style="background:rgba(230,126,34,0.1);"><span>🍽️ Lunch Deducted</span><span class="breakdown-time" style="color:#e67e22;">-${state.carrierLunchDeducted} min</span></div>`;
+        }
+        
         list.innerHTML = html || '<div style="text-align:center;color:#888;padding:10px;">No tasks recorded yet</div>';
-        document.getElementById('breakdownTotal').textContent = formatTime(totalMs);
+        document.getElementById('breakdownTotal').textContent = formatTime(Math.max(0, totalMs));
     }
     
     function addCustomTask() {
@@ -1243,6 +1280,11 @@
         state.break2Taken = false;
         state.activeBreakType = null;
         
+        // Reset carrier lunch/second trip states for new day
+        state.carrierLunchDeducted = 0;
+        state.secondTripRoute = null;
+        state.secondTripStartTime = null;
+        
         // Add GPS arrival if available
         if (state.gpsArrival) {
             state.entries.push({
@@ -1330,6 +1372,60 @@
         saveState();
         updateUI();
         showToast('Clocked out - Total: ' + formatTimeShort(totalTime));
+    }
+    
+    // ==================== CARRIER SECOND TRIP & LUNCH ====================
+    function startSecondTrip() {
+        // Prompt for route number
+        const route = prompt('Enter route number for second trip:');
+        if (!route || route.trim() === '') return;
+        
+        const now = new Date();
+        state.secondTripRoute = route.trim().toUpperCase();
+        state.secondTripStartTime = now.getTime();
+        
+        // Add entry
+        state.entries.push({
+            icon: '🔄',
+            text: `Second Trip Started - Route ${state.secondTripRoute}`,
+            time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            timestamp: now.getTime(),
+            type: 'secondtrip'
+        });
+        
+        saveState();
+        renderEntries();
+        showToast(`Second trip started on Route ${state.secondTripRoute}`);
+    }
+    
+    function deductCarrierLunch() {
+        // Prompt for lunch duration
+        const minutesStr = prompt('How many minutes for lunch? (e.g., 30, 45, 60)');
+        if (!minutesStr) return;
+        
+        const minutes = parseInt(minutesStr);
+        if (isNaN(minutes) || minutes <= 0 || minutes > 120) {
+            showToast('Please enter a valid number (1-120 minutes)');
+            return;
+        }
+        
+        const now = new Date();
+        state.carrierLunchDeducted = (state.carrierLunchDeducted || 0) + minutes;
+        
+        // Add entry
+        state.entries.push({
+            icon: '🍽️',
+            text: `Lunch Deducted - ${minutes} min (unpaid)`,
+            time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            timestamp: now.getTime(),
+            type: 'lunchdeduct',
+            minutes: minutes
+        });
+        
+        saveState();
+        renderEntries();
+        renderTaskBreakdown();
+        showToast(`${minutes} minutes deducted for unpaid lunch`);
     }
     
     // ==================== CLERK LUNCH & BREAKS ====================
