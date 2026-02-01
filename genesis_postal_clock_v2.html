@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <title>📮 Genesis Postal Clock</title>
+    <title>📮 Genesis Postal Clock v3</title>
     <!-- OpenCV.js for document scanning -->
     <script async src="https://docs.opencv.org/4.7.0/opencv.js" onload="onOpenCvReady()"></script>
     <!-- Tesseract.js for OCR -->
@@ -778,7 +778,49 @@
         
         // Persist state every 5 seconds
         setInterval(saveState, 5000);
+        
+        // Refresh GPS when app becomes visible again (user returns to app)
+        // Also ensure timer is still running if user is clocked in
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                console.log('App visible - checking state...');
+                
+                // Refresh GPS
+                refreshGPSPosition();
+                
+                // IMPORTANT: Ensure timer is still running if clocked in
+                // This handles cases where the browser suspended JS execution
+                if (state.isClockedIn && state.clockInTime) {
+                    const elapsed = Date.now() - state.clockInTime;
+                    console.log('Still clocked in - elapsed time: ' + formatTime(elapsed));
+                    
+                    // Make sure timer display is updating
+                    updateTimerDisplay();
+                    
+                    // Restart timer interval if it stopped
+                    if (!timerInterval) {
+                        console.log('Timer was stopped - restarting...');
+                        startTimer();
+                    }
+                }
+            }
+        });
     });
+    
+    // Force fresh GPS acquisition (called on app visibility change)
+    function refreshGPSPosition() {
+        if (!navigator.geolocation) return;
+        if (state.settings.geofenceEnabled !== 'on') return;
+        
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                console.log('GPS refreshed on app reopen:', position.coords.latitude, position.coords.longitude);
+                checkGeofence(position);
+            },
+            (err) => console.log('GPS refresh error:', err),
+            { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+        );
+    }
     
     function restoreActiveBreakTimer() {
         // If there's an active break/lunch, restore the timer
@@ -821,13 +863,24 @@
             const parsed = JSON.parse(saved);
             state = { ...state, ...parsed };
             
-            // Check if it's a new day
-            if (state.clockInTime) {
-                const clockInDate = new Date(state.clockInTime).toDateString();
-                const today = new Date().toDateString();
-                if (clockInDate !== today) {
-                    // Auto clock out from yesterday
+            // Check if it's a new day - BUT only auto clock out if it's ACTUALLY a different calendar day
+            // This prevents false triggers from timezone issues or system clock problems
+            if (state.clockInTime && state.isClockedIn) {
+                const clockInDate = new Date(state.clockInTime);
+                const now = new Date();
+                
+                // Only trigger auto-clock-out if:
+                // 1. It's a different calendar date AND
+                // 2. At least 4 hours have passed (to prevent timezone/clock glitches)
+                const isDifferentDay = clockInDate.toDateString() !== now.toDateString();
+                const hoursSinceClockIn = (now.getTime() - state.clockInTime) / (1000 * 60 * 60);
+                
+                if (isDifferentDay && hoursSinceClockIn > 4) {
+                    console.log('Auto clock-out: Different day detected after ' + hoursSinceClockIn.toFixed(1) + ' hours');
                     autoClockOutYesterday();
+                } else if (isDifferentDay) {
+                    // Different day but less than 4 hours - might be a clock glitch, keep session active
+                    console.log('WARNING: Different day detected but only ' + hoursSinceClockIn.toFixed(1) + ' hours - keeping session active');
                 }
             }
         }
@@ -2017,10 +2070,27 @@
         // For demo, set Mansfield office coords (you'd set this when adding office)
         officeCoords = { lat: 32.5632, lng: -97.1417 }; // Mansfield, TX
         
+        // Clear any existing watch first
+        if (geoWatchId) {
+            navigator.geolocation.clearWatch(geoWatchId);
+            geoWatchId = null;
+        }
+        
+        // Force a fresh GPS position immediately on app load (maximumAge: 0 = no cache)
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                console.log('Fresh GPS acquired:', position.coords.latitude, position.coords.longitude);
+                checkGeofence(position);
+            },
+            (err) => console.log('Fresh GPS error:', err),
+            { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+        );
+        
+        // Then start watching with fresh positions only (maximumAge: 0)
         geoWatchId = navigator.geolocation.watchPosition(
             checkGeofence,
             (err) => console.log('Geo error:', err),
-            { enableHighAccuracy: true, maximumAge: 30000 }
+            { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
         );
     }
     
