@@ -273,7 +273,57 @@
   @keyframes micpulse{0%,100%{box-shadow:0 0 0 0 rgba(178,58,72,.5)}50%{box-shadow:0 0 0 7px rgba(178,58,72,0)}}
   .ai-send{background:var(--teal);color:#fff;}
 
-</style>
+
+  /* ===== v2: fullscreen AI, settings, fuzzy options ===== */
+  .ai-bubble{z-index:300;}
+  .ai-panel.open{inset:0;left:0;top:0;right:0;bottom:0;width:auto;max-width:none;max-height:none;border-radius:0;border:none;}
+  .ai-panel.open .ai-log{max-width:680px;width:100%;margin:0 auto;}
+  .ai-panel.open .ai-input{max-width:680px;width:100%;margin:0 auto;padding-right:84px;}
+  .ai-panel.open .ai-voicebig{max-width:680px;width:100%;margin:0 auto;}
+  .ai-gear{background:none;border:none;font-size:17px;cursor:pointer;color:var(--muted);margin-left:auto;}
+  .ai-head .ai-x{margin-left:8px;}
+  .ai-opts{display:flex;flex-direction:column;gap:7px;margin-top:8px;}
+  .ai-opt{text-align:left;background:var(--surface-2);border:1px solid var(--line-strong);border-radius:10px;
+    padding:9px 12px;font-size:14px;cursor:pointer;color:var(--ink);display:flex;align-items:center;gap:8px;}
+  .ai-opt .o-r{font-family:var(--mono);font-weight:700;color:#fff;font-size:11px;padding:1px 7px;border-radius:6px;margin-left:auto;}
+  .ai-confirm{display:flex;gap:8px;margin-top:10px;}
+  .ai-confirm button{flex:1;padding:10px;border-radius:10px;border:none;font-weight:700;cursor:pointer;}
+  .cf-yes{background:var(--ok);color:#fff;} .cf-no{background:var(--line-strong);color:var(--ink);}
+  /* settings overlay */
+  .settings-ov{position:fixed;inset:0;background:var(--paper);z-index:400;display:none;overflow-y:auto;}
+  .settings-ov.open{display:block;}
+  .set-wrap{max-width:620px;margin:0 auto;padding:18px;}
+  .set-top{display:flex;align-items:center;gap:12px;margin-bottom:14px;}
+  .set-top h2{font-size:20px;font-weight:800;}
+  .set-group{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px;box-shadow:var(--shadow);}
+  .set-group label.lbl{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);display:block;margin-bottom:6px;}
+  .set-input,.set-select{width:100%;padding:12px;border:1.5px solid var(--line-strong);border-radius:11px;font-size:16px;
+    background:var(--surface-2);color:var(--ink);font-family:var(--ui);}
+  .day-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;}
+  .day-row .dchk{display:flex;align-items:center;gap:6px;min-width:108px;font-weight:600;}
+  .day-row input[type=checkbox]{width:18px;height:18px;}
+  .day-row .tm{width:62px;padding:8px;border:1px solid var(--line-strong);border-radius:8px;font-size:14px;text-align:center;background:var(--surface-2);color:var(--ink);}
+  .day-row .ap{padding:8px;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface-2);color:var(--ink);}
+  .day-row.off{opacity:.45;}
+  .set-note{font-size:12.5px;line-height:1.5;color:var(--muted);background:#EFE7D8;border:1px solid var(--line);border-radius:10px;padding:11px 13px;}
+  .trig-row{display:flex;gap:8px;align-items:center;}
+  .mini-btn{background:var(--surface-2);border:1px solid var(--line-strong);border-radius:9px;padding:9px 12px;font-weight:600;cursor:pointer;color:var(--ink);font-size:13px;white-space:nowrap;}
+  .toggle-row{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+
+
+  .h-set{background:transparent;border:1px solid var(--line-strong);color:var(--ink);font-size:15px;
+    padding:8px 11px;border-radius:10px;cursor:pointer;}
+  .h-set:active{transform:scale(.97);}
+  .help-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;margin-top:16px;box-shadow:var(--shadow);overflow:hidden;}
+  .help-card summary{cursor:pointer;padding:14px 16px;font-weight:700;font-size:14px;list-style:none;display:flex;align-items:center;gap:8px;}
+  .help-card summary::-webkit-details-marker{display:none;}
+  .help-card summary::after{content:"\25B8";margin-left:auto;color:var(--muted);transition:transform .2s;}
+  .help-card[open] summary::after{transform:rotate(90deg);}
+  .help-body{padding:0 16px 16px;font-size:13.5px;line-height:1.55;color:var(--ink);}
+  .help-body ul{margin:8px 0 8px 18px;} .help-body li{margin-bottom:5px;} .help-body p{margin:0 0 8px;}
+  .help-body b{color:var(--teal);}
+
+</style></style>
 </head>
 <body>
 
@@ -330,6 +380,7 @@
       <div class="h-actions">
         <button class="h-learn" onclick="showLearn()">📘 Learn</button>
         <button class="h-switch" onclick="showPicker()">⇄ Switch</button>
+        <button class="h-set" onclick="openSettings()" title="Settings">⚙</button>
       </div>
     </div>
   </div>
@@ -356,7 +407,23 @@
 
     <div class="results" id="results"></div>
 
-    <div class="stats" id="stats"></div>
+    <div class="stats" id="stats"></div><div class="stats" id="stats"></div>
+
+    <details class="help-card">
+      <summary>💬 How to use the assistant</summary>
+      <div class="help-body">
+        <p>Tap the <b>globe</b> (bottom-right) to open the assistant — it fills the screen so you can read and scroll. Tap the globe again to minimize it.</p>
+        <ul>
+          <li>Type or say a street or address to get its route — e.g. “what route is Barbados Dr”.</li>
+          <li>With the mic on, start your sentence with “<b>what route is</b> …” (you can change that phrase in Settings).</li>
+          <li>Add a route by voice or text: “add Oak Dr 100 to 500 to route 4” — it reads it back to confirm.</li>
+          <li>Ask “streets on R011”, “how many routes”, or follow up with “what about the even side?”</li>
+          <li>Misheard or misspelled? It shows the closest streets to tap.</li>
+        </ul>
+        <p>Set your name, schedule, and weather under <b>⚙ Settings</b> in the top bar.</p>
+      </div>
+    </details>
+
 
     <button class="btn btn-ghost" style="margin-top:16px;" onclick="showAddPage()">+ Add a local route</button>
   </div>
@@ -489,6 +556,7 @@
 <div id="aiBubble" class="ai-bubble" onclick="toggleAI()" title="Route assistant"></div>
 <div id="aiPanel" class="ai-panel">
   <div class="ai-head"><span class="ai-dot"></span> Route Assistant
+    <button class="ai-gear" onclick="openSettings()" title="Settings">⚙</button>
     <button class="ai-x" onclick="toggleAI()">✕</button>
   </div>
   <div id="aiVoiceBig" class="ai-voicebig">
@@ -503,6 +571,75 @@
     <input id="aiText" placeholder="Ask about a street or route…"
            autocomplete="off" onkeydown="if(event.key==='Enter'){aiSend();}">
     <button class="ai-send" onclick="aiSend()">→</button>
+  </div>
+</div>
+
+
+<!-- ============ SETTINGS ============ -->
+<div id="settingsOv" class="settings-ov">
+  <div class="set-wrap">
+    <div class="set-top">
+      <button class="back-btn" onclick="closeSettings()">← Done</button>
+      <h2>Assistant settings</h2>
+    </div>
+
+    <div class="set-group">
+      <label class="lbl">Your name</label>
+      <input id="setName" class="set-input" placeholder="What should I call you?" autocomplete="off">
+    </div>
+
+    <div class="set-group">
+      <label class="lbl">Your position</label>
+      <select id="setPos" class="set-select">
+        <option value="">— Select —</option>
+        <option>Clerk</option>
+        <option>City Carrier</option>
+        <option>Rural Carrier</option>
+        <option>Supervisor</option>
+        <option>Postmaster</option>
+      </select>
+    </div>
+
+    <div class="set-group">
+      <label class="lbl">Your schedule</label>
+      <div id="dayRows"></div>
+      <button class="mini-btn" style="margin-top:4px;" onclick="applyAllDays()">Apply first day’s time to all checked</button>
+    </div>
+
+    <div class="set-group">
+      <div class="toggle-row">
+        <div>
+          <label class="lbl" style="margin:0;">Weather help</label>
+          <div style="font-size:12.5px;color:var(--muted);margin-top:3px;">Let me use your location to mention cold or rain.</div>
+        </div>
+        <input type="checkbox" id="setWx" style="width:22px;height:22px;">
+      </div>
+    </div>
+
+    <div class="set-group">
+      <label class="lbl">Voice trigger phrase</label>
+      <div style="font-size:12.5px;color:var(--muted);margin:-2px 0 8px;">With the mic on, I answer when you start a sentence with this.</div>
+      <div class="trig-row">
+        <input id="setTrig" class="set-input" placeholder="what route is">
+        <button class="mini-btn" onclick="resetTrigger()">Default</button>
+      </div>
+    </div>
+
+    <div class="set-group">
+      <div class="set-note" id="privacyNote"></div>
+    </div>
+
+    <div class="set-group">
+      <div class="toggle-row">
+        <div>
+          <label class="lbl" style="margin:0;">Jokes &amp; personality</label>
+          <div style="font-size:12.5px;color:var(--muted);margin-top:3px;">A little humor and sass in my replies. Turn off for strictly business.</div>
+        </div>
+        <input type="checkbox" id="setSass" style="width:22px;height:22px;">
+      </div>
+    </div>
+
+    <button id="setSaveBtn"    <button id="setSaveBtn" class="btn btn-add" onclick="saveSettings()">Save</button>
   </div>
 </div>
 
@@ -1385,7 +1522,477 @@ function processVoice(){
   // keep the result on screen; buffer cleared, waiting for next utterance
 }
 
-/* ---------- boot ---------- */
+
+/* ============================================================
+   v2  PROFILE + PERSONALITY + SMARTER ENGINE + WEATHER + VOICE++
+   ============================================================ */
+var PROFILE = loadJSON('genesisProfile', {name:'',pos:'',schedule:{},wx:false,trigger:'what route is'});
+if(!PROFILE.trigger) PROFILE.trigger='what route is';
+var DAYS=[['mon','Monday'],['tue','Tuesday'],['wed','Wednesday'],['thu','Thursday'],['fri','Friday'],['sat','Saturday'],['sun','Sunday']];
+var PRIVACY="Your name, role, and schedule are saved only on this device, to help the assistant work better for you. They’re never uploaded, shared, or seen by anyone. If you turn on weather, only your approximate location is sent to a weather service to check conditions — nothing is tied to your name or kept.";
+
+/* ---------- settings UI ---------- */
+function openSettings(){
+  document.getElementById('setName').value=PROFILE.name||'';
+  document.getElementById('setPos').value=PROFILE.pos||'';
+  document.getElementById('setWx').checked=!!PROFILE.wx;
+  document.getElementById('setTrig').value=PROFILE.trigger||'what route is';
+  document.getElementById('privacyNote').textContent=PRIVACY;
+  renderDayRows();
+  document.getElementById('settingsOv').classList.add('open');
+}
+function closeSettings(){ document.getElementById('settingsOv').classList.remove('open'); }
+function resetTrigger(){ document.getElementById('setTrig').value='what route is'; }
+function renderDayRows(){
+  const host=document.getElementById('dayRows');
+  const sc=PROFILE.schedule||{};
+  host.innerHTML=DAYS.map(([k,name])=>{
+    const d=sc[k]||{};
+    const on=!!d.work;
+    return `<div class="day-row ${on?'':'off'}" id="dr_${k}">
+      <label class="dchk"><input type="checkbox" ${on?'checked':''} onchange="toggleDay('${k}',this.checked)"> ${name}</label>
+      <input class="tm" id="st_${k}" value="${d.start||''}" placeholder="9:00">
+      <select class="ap" id="sa_${k}"><option ${d.startap!=='PM'?'selected':''}>AM</option><option ${d.startap==='PM'?'selected':''}>PM</option></select>
+      <span style="color:var(--muted)">–</span>
+      <input class="tm" id="et_${k}" value="${d.end||''}" placeholder="6:00">
+      <select class="ap" id="ea_${k}"><option ${d.endap==='AM'?'selected':''}>AM</option><option ${d.endap!=='AM'?'selected':''}>PM</option></select>
+    </div>`;
+  }).join('');
+}
+function toggleDay(k,on){ document.getElementById('dr_'+k).classList.toggle('off',!on); }
+function applyAllDays(){
+  // copy the first CHECKED day's times into every checked day
+  let src=null;
+  for(const [k] of DAYS){ if(document.querySelector('#dr_'+k+' input[type=checkbox]').checked){ src=k; break; } }
+  if(!src){ toast('Check a day first'); return; }
+  const s=document.getElementById('st_'+src).value, sa=document.getElementById('sa_'+src).value;
+  const e=document.getElementById('et_'+src).value, ea=document.getElementById('ea_'+src).value;
+  DAYS.forEach(([k])=>{ if(document.querySelector('#dr_'+k+' input[type=checkbox]').checked){
+    document.getElementById('st_'+k).value=s; document.getElementById('sa_'+k).value=sa;
+    document.getElementById('et_'+k).value=e; document.getElementById('ea_'+k).value=ea;
+  }});
+  toast('Applied to all working days');
+}
+function saveSettings(){
+  PROFILE.name=document.getElementById('setName').value.trim();
+  PROFILE.pos=document.getElementById('setPos').value;
+  PROFILE.wx=document.getElementById('setWx').checked;
+  PROFILE.trigger=(document.getElementById('setTrig').value.trim()||'what route is').toLowerCase();
+  const sc={};
+  DAYS.forEach(([k])=>{
+    const on=document.querySelector('#dr_'+k+' input[type=checkbox]').checked;
+    sc[k]={work:on, start:document.getElementById('st_'+k).value.trim(), startap:document.getElementById('sa_'+k).value,
+           end:document.getElementById('et_'+k).value.trim(), endap:document.getElementById('ea_'+k).value};
+  });
+  PROFILE.schedule=sc;
+  saveJSON('genesisProfile',PROFILE);
+  closeSettings();
+  toast('Saved — thanks'+(PROFILE.name?', '+PROFILE.name:''));
+  wxChecked=false;              // allow a fresh weather note
+  const log=document.getElementById('aiLog'); if(log) log.innerHTML='';
+}
+
+/* ---------- time + shift ---------- */
+function timeOfDay(){ const h=new Date().getHours(); return h<5?'late':h<12?'morning':h<17?'afternoon':h<21?'evening':'late'; }
+function to24(t,ap){ let m=String(t||'').match(/(\d{1,2})(?::(\d{2}))?/); if(!m) return null;
+  let hh=+m[1]%12; if((ap||'').toUpperCase()==='PM') hh+=12; return hh*60+(+(m[2]||0)); }
+function shiftNote(){
+  const sc=PROFILE.schedule||{}; const k=DAYS[(new Date().getDay()+6)%7][0]; const d=sc[k];
+  if(!d||!d.work) return PROFILE.name? '' : '';
+  const now=new Date().getHours()*60+new Date().getMinutes();
+  const s=to24(d.start,d.startap), e=to24(d.end,d.endap);
+  if(s==null||e==null) return '';
+  if(now<s-30) return 'shift starts soon';
+  if(now>=s-30 && now<s) return 'about to start your shift';
+  if(now>=e) return 'off the clock — nice work today';
+  const left=e-now;
+  if(left<=30) return 'almost done for the day';
+  if(left<=120) return `about ${Math.round(left/60*10)/10} hr left on shift`;
+  return 'on shift';
+}
+function greet(){
+  const t=timeOfDay(); const nm=PROFILE.name?(', '+PROFILE.name):'';
+  const base = t==='morning'?`Morning${nm}`:t==='afternoon'?`Afternoon${nm}`:t==='evening'?`Evening${nm}`:`Hey${nm}`;
+  const sn=shiftNote();
+  const tail = sn && sn!=='on shift' ? ' — '+sn+'.' : '.';
+  return base+tail+' Ask me a street or address, or tap the mic.';
+}
+
+/* ---------- fuzzy + phonetic matching ---------- */
+function lev(a,b){
+  a=a||'';b=b||''; const m=a.length,n=b.length; if(!m)return n; if(!n)return m;
+  let prev=Array.from({length:n+1},(_,i)=>i), cur=new Array(n+1);
+  for(let i=1;i<=m;i++){ cur[0]=i;
+    for(let j=1;j<=n;j++){ const c=a[i-1]===b[j-1]?0:1; cur[j]=Math.min(prev[j]+1,cur[j-1]+1,prev[j-1]+c); }
+    [prev,cur]=[cur,prev];
+  }
+  return prev[n];
+}
+function phon(s){ return String(s||'').toUpperCase().replace(/[^A-Z]/g,'')
+  .replace(/PH/g,'F').replace(/[AEIOU]/g,'').replace(/(.)\1+/g,'$1'); }
+function streetNames(){ return [...new Set(allRoutes().map(r=>r.n))]; }
+function fuzzyStreets(q, limit){
+  limit=limit||5;
+  const qs=normalizeStreet(q); if(!qs) return [];
+  const qp=phon(qs);
+  const scored=streetNames().map(n=>{
+    const ns=normalizeStreet(n);
+    let d=lev(qs,ns);
+    // reward substring / same-phonetic
+    if(ns.indexOf(qs)!==-1||qs.indexOf(ns)!==-1) d-=2;
+    if(phon(ns)===qp) d-=1.5;
+    const norm=d/Math.max(qs.length,ns.length);
+    return {n, d, norm};
+  }).filter(x=>x.norm<0.55).sort((a,b)=>a.d-b.d);
+  return scored.slice(0,limit).map(x=>x.n);
+}
+
+/* ---------- spoken number words -> digits (best effort) ---------- */
+var NUMW={zero:0,oh:0,o:0,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,
+  ten:10,eleven:11,twelve:12,thirteen:13,fourteen:14,fifteen:15,sixteen:16,seventeen:17,eighteen:18,nineteen:19,
+  twenty:20,thirty:30,forty:40,fourty:40,fifty:50,sixty:60,seventy:70,eighty:80,ninety:90,hundred:100,thousand:1000};
+function wordsToDigits(text){
+  const toks=text.toLowerCase().replace(/[-]/g,' ').split(/\s+/);
+  // take leading run of number words
+  let i=0, run=[]; while(i<toks.length && (toks[i] in NUMW)){ run.push(toks[i]); i++; }
+  if(!run.length) return text;
+  const rest=toks.slice(i).join(' ');
+  let num;
+  if(run.some(w=>w==='hundred'||w==='thousand')){
+    let total=0,cur=0;
+    run.forEach(w=>{const v=NUMW[w];
+      if(v===100) cur=(cur||1)*100;
+      else if(v===1000){ total+=(cur||1)*1000; cur=0; }
+      else cur+=v; });
+    num=total+cur;
+  }else{
+    const vals=run.map(w=>NUMW[w]); const parts=[];
+    for(let j=0;j<vals.length;j++){
+      if(j+1<vals.length && vals[j]>=20 && vals[j]<=90 && vals[j]%10===0 && vals[j+1]>=1 && vals[j+1]<=9){ parts.push(vals[j]+vals[j+1]); j++; }
+      else if(j+1<vals.length && vals[j]===0 && vals[j+1]>=1 && vals[j+1]<=9){ parts.push('0'+vals[j+1]); j++; }
+      else parts.push(vals[j]);
+    }
+    num=parts.map((p,idx)=> idx===0?String(p):String(p).padStart(2,'0')).join('');
+  }
+  return (num+' '+rest).trim();
+}
+
+/* ---------- conversational memory ---------- */
+var AICTX={street:'',number:null,route:''};
+
+/* ---------- add-street parsing (text or voice) ---------- */
+function parseAddCommand(raw){
+  const low=raw.toLowerCase();
+  if(!/\badd\b/.test(low)) return null;
+  let s=' '+low.replace(/[-]/g,' ').replace(/\s+/g,' ')+' ';
+  // convert number-words right after 'route'/'to' to digits ("route four" -> "route 4")
+  s=s.replace(/\broute\s+([a-z]+)\b/g,(m,w)=> (w in NUMW)? ('route '+NUMW[w]) : m);
+  s=s.replace(/\bto\s+([a-z]+)\b/g,(m,w)=> (w in NUMW)? ('to '+NUMW[w]) : m);
+  let letter='',numTok='',routePhrase='';
+  let rm=s.match(/\broute\s+([crh])?\s*([0-9]{1,3})\b/);
+  if(rm){ routePhrase=rm[0]; letter=(rm[1]||'').toUpperCase(); numTok=rm[2]; }
+  else{ const all=[...s.matchAll(/\bto\s+([crh])?\s*([0-9]{1,3})\b/g)]; if(!all.length) return null;
+        rm=all[all.length-1]; routePhrase=rm[0]; letter=(rm[1]||'').toUpperCase(); numTok=rm[2]; }
+  const num=numTok;
+  let rem=s.replace(routePhrase,' ').replace(/\bto\s+$/,' ').replace(/\s+/g,' ');
+  let range=rem.match(/(\d{1,5})\s*(?:to|through|thru|–)\s*(\d{1,5})/);
+  let f=range?+range[1]:null, l=range?+range[2]:null;
+  if(range) rem=rem.replace(range[0],' ');
+  let o='B'; const hasO=/\bodd\b/.test(low), hasE=/\beven\b/.test(low);
+  if(hasO&&!hasE) o='O'; else if(hasE&&!hasO) o='E';
+  let street=rem.replace(/\badd\b/,' ').replace(/\b(odd|even|both|and|the|range|to|side|sides|number|numbers)\b/g,' ')
+               .replace(/[,.]/g,' ').replace(/\s\b\d{2,5}\b\s*$/,' ').replace(/\s+/g,' ').trim();
+  if(!street) return null;
+  const ids=allRoutes().map(r=>r.r.toUpperCase());
+  let candidates;
+  if(letter) candidates=ids.filter(id=>id[0]===letter && parseInt(id.slice(1),10)===parseInt(num,10));
+  else candidates=[...new Set(ids.filter(id=>parseInt(id.slice(1),10)===parseInt(num,10)))];
+  let routeId;
+  if(candidates.length===1) routeId=candidates[0];
+  else if(candidates.length===0){ const w=(ids[0]&&ids[0].length>=4)?3:2; routeId=(letter||'R')+String(parseInt(num,10)).padStart(w,'0'); }
+  else return {ambiguous:true, street:normalizeStreet(street), candidates, f,l,o};
+  return {street:normalizeStreet(street), route:routeId, f,l,o};
+}
+function doAddRoute(info){
+  // mirror the app's user-route storage
+  const rec={n:info.street, r:info.route, t:info.route[0]==='C'?'city':(info.route[0]==='H'?'hcr':'rural'), f:info.f, l:info.l, o:info.o};
+  if(OFFICE.zips.length>1) rec.z=OFFICE.zips[0];
+  userRoutes.push(rec);
+  saveJSON('userRoutes_'+OFFICE.key, userRoutes);
+  renderStats();
+  return rec;
+}
+var pendingAdd=null;
+
+/* ---------- AI answer (override, smarter) ---------- */
+function aiAnswer(qRaw){
+  if(!OFFICE) return {html:'Pick an office first.'};
+  const q=aiNorm(qRaw);
+  if(!q) return {html:'Say or type a street or address.'};
+  // add-route command
+  const add=parseAddCommand(qRaw);
+  if(add){
+    if(add.ambiguous){
+      return {html:`Route ${add.candidates.join(' or ')}? Tap one:`, opts:add.candidates.map(c=>({label:'Route '+c, route:c, add:{street:add.street,route:c,f:add.f,l:add.l,o:add.o}}))};
+    }
+    pendingAdd=add;
+    const rng=(add.f!=null)?`, ${add.f}–${add.l}`:'';
+    const side=add.o==='O'?'odd':add.o==='E'?'even':'both sides';
+    return {html:`Add <b>${add.street}</b> to <span class="mroute">${add.route}</span>${rng} (${side})?`, confirm:true};
+  }
+  // greetings / help
+  if(/^(hi|hello|hey|yo|help|what can you do|who are you)\b/.test(q))
+    return {html:greet().replace('Ask me a street or address, or tap the mic.','I can find routes, list a route’s streets, add routes, and more. Try “what route is Main” or “add Oak Dr to route 4”.')};
+  if(/thank|thx|appreciate/.test(q)) return {html:(PROFILE.name?PROFILE.name+', ':'')+'anytime.'};
+  // counts
+  if(/how many routes|number of routes|total routes|route count/.test(q)){
+    const id=Object.keys(DATA).find(k=>DATA[k]===OFFICE); const s=routeSummary(id);
+    return {html:`${OFFICE.name}: <b>${s.city}</b> city, <b>${s.rural}</b> rural${s.hcr?`, <b>${s.hcr}</b> contract`:''} — ${s.total} routes.`};
+  }
+  if(/\b(office|zip|zip code|where am i|which office)\b/.test(q) && !/\d{3,}/.test(q))
+    return {html:`${OFFICE.name} — ZIP ${OFFICE.zips.join(', ')}.`};
+  if(/how.*(add|enter).*route/.test(q))
+    return {html:'Just tell me, e.g. “add Dallas Ave 100 to 500 to route 4” — or use <b>+ Add a local route</b> on the search page.'};
+  // list streets on a route
+  if(/street|what('?s| is) on|list|show me/.test(q)){
+    const rid=matchRouteId(q);
+    if(rid){
+      const names=[...new Set(routeStreets(rid).map(r=>r.n))].sort();
+      if(!names.length) return {html:`Nothing on route ${rid}.`};
+      return {html:`<b>Route ${rid}</b> — ${names.length} streets:<br>`+names.slice(0,50).join(', ')+(names.length>50?` …(+${names.length-50})`:'')};
+    }
+  }
+  // follow-ups using memory: "even side", "odd side", "between 400 and 800"
+  if(AICTX.street && /\b(odd|even|both|side|between|from)\b/.test(q) && !/\b[a-z]{3,}\b.*\b(dr|st|ave|ln|ct|rd|blvd|way|cir|trl|pl|pkwy)\b/.test(q)){
+    let base=AICTX.street;
+    let rng=q.match(/(\d{1,5}).*?(\d{1,5})/);
+    let probe = (rng?rng[1]+' ':'')+base;
+    const res=lookup(probe);
+    let rows=res.rows;
+    if(/\bodd\b/.test(q)) rows=rows.filter(r=>r.o!=='E');
+    if(/\beven\b/.test(q)) rows=rows.filter(r=>r.o!=='O');
+    if(rows.length) return {html:'<b>Route '+rows[0].r+'</b> — '+rows.map(r=>r.n+(r.f!=null?` (${r.f}–${r.l})`:'')).slice(0,4).join('; ')};
+  }
+  // normal lookup (with spoken-number + fuzzy fallback)
+  let cleaned=qRaw.replace(/^(what\s+route\s+is|which\s+route\s+is|route\s+for|route\s+of|what\s+route|where\s+is|look\s*up|lookup|find)\s+/i,'').replace(/\?+$/,'').trim();
+  cleaned=wordsToDigits(cleaned);
+  let res=lookup(cleaned||qRaw);
+  if(!res.rows.length){
+    // fuzzy: show closest options
+    const p=parseInput(cleaned); const opts=fuzzyStreets(p.street||cleaned,5);
+    if(opts.length) return {html:`No exact match. Did you mean:`, opts:opts.map(n=>({label:n, pick:(p.number?p.number+' ':'')+n}))};
+    return {html:`No match for <b>${cleaned}</b> in ${OFFICE.name}.`};
+  }
+  const top=res.rows[0]; AICTX={street:top.n,number:parseInput(cleaned).number,route:top.r};
+  return lookupAnswer(cleaned||qRaw);
+}
+
+/* handle option / confirm clicks coming from buttons we render */
+function aiOpt(payload){
+  const o=JSON.parse(decodeURIComponent(payload));
+  if(o.add){ const rec=doAddRoute(o.add); aiBot({html:`Added <b>${rec.n}</b> → <span class="mroute">${rec.r}</span>.`}); return; }
+  if(o.pick){ document.getElementById('aiText').value=o.pick; aiSend(); return; }
+}
+function aiConfirm(yes){
+  if(yes && pendingAdd){ const rec=doAddRoute(pendingAdd); aiBot({html:`Added <b>${rec.n}</b> → <span class="mroute">${rec.r}</span>.`}); }
+  else aiBot({html:'Okay, nothing added.'});
+  pendingAdd=null;
+}
+
+/* ---------- aiBot override to render options / confirm ---------- */
+function aiBot(ans){
+  const d=document.createElement('div'); d.className='ai-msg bot'; d.innerHTML=ans.html;
+  if(ans.opts){ const box=document.createElement('div'); box.className='ai-opts';
+    ans.opts.forEach(op=>{ const b=document.createElement('button'); b.className='ai-opt';
+      b.innerHTML=op.label+(op.route?`<span class="o-r" style="background:var(--clay)">${op.route}</span>`:'');
+      b.onclick=()=>aiOpt(encodeURIComponent(JSON.stringify(op))); box.appendChild(b); });
+    d.appendChild(box);
+  }
+  if(ans.confirm){ const box=document.createElement('div'); box.className='ai-confirm';
+    box.innerHTML='<button class="cf-yes" onclick="aiConfirm(true)">Confirm</button><button class="cf-no" onclick="aiConfirm(false)">Cancel</button>';
+    d.appendChild(box);
+  }
+  document.getElementById('aiLog').appendChild(d); scrollAI();
+}
+
+/* ---------- toggleAI override: fullscreen + greeting + weather ---------- */
+function toggleAI(){
+  const p=document.getElementById('aiPanel'); p.classList.toggle('open');
+  if(p.classList.contains('open')){
+    if(!document.getElementById('aiLog').childElementCount) aiBot({html:greet()});
+    maybeWeather();
+    setTimeout(()=>{const t=document.getElementById('aiText'); if(t)t.focus();},120);
+  } else { stopMic(); }
+}
+
+/* ---------- weather (Open-Meteo, keyless, opt-in) ---------- */
+var wxChecked=false;
+function maybeWeather(){
+  if(!PROFILE.wx || wxChecked || !navigator.geolocation) return;
+  wxChecked=true;
+  navigator.geolocation.getCurrentPosition(pos=>{
+    const {latitude,longitude}=pos.coords;
+    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude.toFixed(3)}&longitude=${longitude.toFixed(3)}&current=temperature_2m,precipitation,weather_code&daily=precipitation_probability_max&temperature_unit=fahrenheit&timezone=auto`)
+      .then(r=>r.json()).then(w=>{
+        const t=Math.round(w.current.temperature_2m);
+        const rainNow=w.current.precipitation>0;
+        const rainChance=(w.daily.precipitation_probability_max||[0])[0];
+        const carrierRole=/carrier/i.test(PROFILE.pos);
+        const bossRole=/supervis|postmaster|clerk/i.test(PROFILE.pos);
+        let msg='';
+        if(rainNow||rainChance>=55){
+          msg = bossRole ? `Rain likely today (${rainChance}% ). Good idea to remind the carriers to grab rain gear.`
+              : carrierRole ? `Rain likely today (${rainChance}% ) — take your rain gear out there.`
+              : `Rain likely today (${rainChance}% ) — stay dry.`;
+        } else if(t<=38){
+          msg = carrierRole ? `It’s ${t}° out — bundle up on the route.` : `Cold one — ${t}° out. Stay warm.`;
+        } else if(t>=95){
+          msg = `Hot today — ${t}°. ${carrierRole?'Hydrate out there.':'Keep water handy.'}`;
+        }
+        if(msg) aiBot({html:'☀️ '+msg});
+      }).catch(()=>{});
+  }, ()=>{}, {timeout:8000, maximumAge:1800000});
+}
+
+/* ---------- VOICE override: trigger phrase, accent options, add ---------- */
+function startMic(){
+  if(!voiceSupported()){ toast('Voice needs Chrome / Edge.'); return; }
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  recog=new SR(); recog.lang='en-US'; recog.continuous=true; recog.interimResults=true;
+  recog.onresult=(e)=>{
+    let txt=''; for(let i=0;i<e.results.length;i++) txt+=e.results[i][0].transcript+' ';
+    voiceBuf=txt.trim();
+    document.getElementById('vbAddr').textContent=voiceBuf||'Listening…';
+    document.getElementById('vbWait').textContent='';
+    clearTimeout(voiceTimer); voiceTimer=setTimeout(()=>processVoice(),2500);
+  };
+  recog.onerror=(e)=>{ if(e.error==='not-allowed'||e.error==='service-not-allowed'){ micOn=false; updateMicUI(); toast('Microphone blocked.'); } };
+  recog.onend=()=>{ if(micOn){ try{recog.start();}catch(e){} } };
+  try{ recog.start(); micOn=true; updateMicUI();
+    if(!document.getElementById('aiPanel').classList.contains('open')) toggleAI();
+  }catch(e){ toast('Could not start mic.'); }
+}
+function triggerMatch(text){
+  // forgiving: strip punctuation, collapse, compare start against trigger (allow small typo)
+  const trig=(PROFILE.trigger||'what route is').toLowerCase().replace(/\s+/g,' ').trim();
+  const t=text.toLowerCase().replace(/[^a-z0-9 ]/g,'').replace(/\s+/g,' ').trim();
+  const words=trig.split(' ').length;
+  const head=t.split(' ').slice(0,words).join(' ');
+  if(head===trig) return t.split(' ').slice(words).join(' ');
+  if(lev(head,trig)<=2) return t.split(' ').slice(words).join(' ');
+  // also accept bare "route X"
+  if(/^route\s+/.test(t)) return t.replace(/^route\s+/,'');
+  return null;
+}
+function processVoice(){
+  let text=(voiceBuf||'').trim(); voiceBuf='';
+  if(!text) return;
+  // add-route by voice
+  const add=parseAddCommand(text);
+  if(add && !add.ambiguous){ if(!document.getElementById('aiPanel').classList.contains('open')) toggleAI();
+    pendingAdd=add; aiUser('🎙 '+text);
+    aiBot({html:`Add <b>${add.street}</b> to <span class="mroute">${add.route}</span>${add.f!=null?`, ${add.f}–${add.l}`:''}?`, confirm:true}); return; }
+  // only act on the trigger phrase
+  const after=triggerMatch(text);
+  if(after===null){ document.getElementById('vbWait').textContent='(say “'+(PROFILE.trigger||'what route is')+' …”)'; return; }
+  let q=wordsToDigits(after.trim()); if(!q) return;
+  const res=lookup(q);
+  const vbA=document.getElementById('vbAddr'),vbR=document.getElementById('vbRoute'),vbS=document.getElementById('vbStreet'),vbW=document.getElementById('vbWait');
+  vbA.textContent=q.toUpperCase();
+  if(res.rows.length){
+    const top=res.rows[0];
+    vbR.textContent=top.r; vbR.style.color=top.t==='city'?'#7fd3dc':(top.t==='hcr'?'#d9cf7a':'#f0a876');
+    vbS.textContent=top.n+(top.f!=null?`  ${top.f}–${top.l}`:'');
+    AICTX={street:top.n,number:parseInput(q).number,route:top.r};
+    try{logWeak(q);}catch(e){}
+    vbW.textContent='● ready — say the next one';
+  } else {
+    const p=parseInput(q); const opts=fuzzyStreets(p.street||q,4);
+    vbR.textContent='?'; vbR.style.color='#f0a876';
+    vbS.textContent=opts.length?'did you mean…':'no match';
+    vbW.textContent='';
+    if(opts.length){ aiBot({html:`Heard “${q}” — closest:`, opts:opts.map(n=>({label:n, pick:(p.number?p.number+' ':'')+n}))}); }
+  }
+}
+
+/* ---------- boot profile bits ---------- */
+(function(){ try{ if(!localStorage.getItem('genesisProfile')) saveJSON('genesisProfile',PROFILE); }catch(e){} })();
+
+
+/* ============================================================
+   v2.1  PERSONALITY / SASS (toggle in settings)
+   ============================================================ */
+if(PROFILE.sass===undefined) PROFILE.sass=true;
+var SASS={
+ lookup:["Too easy.","Knew that one cold.","Barely broke a sweat.","That one’s muscle memory.","Next one.","Child’s play."],
+ nomatch:["That’s not one of ours — or the spelling’s having a rough day.","Doesn’t ring a bell. Say it slow, for the new guy.","Nope. Either wrong town or autocorrect struck again.","I’ve got every street in this office memorized, and that ain’t one."],
+ added:["Look at you, keeping me current.","I’ll act like I knew that street all along.","Filed. You’re basically my supervisor now.","Noted. The scheme grows stronger."],
+ thanks:["Anytime — I live for this.","That’s what they keep me around for.","Don’t mention it. Actually, do — I like it."]
+};
+function sass(kind,always){ if(!PROFILE.sass) return ''; var p=SASS[kind]; if(!p) return '';
+  if(!always && Math.random()>0.4) return ''; return p[Math.random()*p.length|0]; }
+function sassTail(kind){ var s=sass(kind); return s? ' <span style="color:var(--muted)">'+s+'</span>' : ''; }
+
+/* sassier greeting */
+function greet(){
+  var t=timeOfDay(); var nm=PROFILE.name?(', '+PROFILE.name):'';
+  var base = t==='morning'?('Morning'+nm):t==='afternoon'?('Afternoon'+nm):t==='evening'?('Evening'+nm):('Hey'+nm);
+  var sn=shiftNote(); var tail = (sn && sn!=='on shift') ? ' — '+sn+'.' : '.';
+  var extra='';
+  if(PROFILE.sass){
+    var g = t==='morning'?["Coffee first, routes second.","Let’s move some mail."]
+          : t==='evening'?["Home stretch.","The mail’s not gonna sort itself… oh wait, that’s us."]
+          : ["Let’s find some routes.","Ready when you are."];
+    extra=' '+g[Math.random()*g.length|0];
+    if(sn==='almost done for the day') extra=" Almost quittin’ time — hang in there.";
+  }
+  return base+tail+extra+' Ask me a street or address, or tap the mic.';
+}
+
+/* lookup answer with an occasional aside */
+function lookupAnswer(text){
+  var res=lookup(text);
+  if(!res.rows.length) return {html:`No match for <b>${text}</b> in ${OFFICE.name}. Try just the street name.`};
+  var rows=res.rows.slice(0,5);
+  var items=rows.map(function(r){
+    var rng=(r.f!=null&&r.l!=null)?` <span style="color:var(--muted);font-family:var(--mono)">${r.f}–${r.l}${r.o!=='B'?(r.o==='O'?' odd':' even'):''}</span>`:'';
+    return `${r.n} → <span class="mroute">${r.r}</span>${rng}`;
+  });
+  var head = res.mode==='exact' ? `<b>Route ${res.rows[0].r}</b><br>` : '';
+  var more = res.rows.length>5 ? `<br><span style="color:var(--muted)">+${res.rows.length-5} more…</span>`:'';
+  return {html: head + items.join('<br>') + more + (res.mode==='exact'?sassTail('lookup'):''), route:res.rows[0]};
+}
+
+/* added-route quips */
+function aiConfirm(yes){
+  if(yes && pendingAdd){ var rec=doAddRoute(pendingAdd); aiBot({html:`Added <b>${rec.n}</b> → <span class="mroute">${rec.r}</span>.`+sassTail('added')}); }
+  else aiBot({html:'Okay, nothing added.'});
+  pendingAdd=null;
+}
+function aiOpt(payload){
+  var o=JSON.parse(decodeURIComponent(payload));
+  if(o.add){ var rec=doAddRoute(o.add); aiBot({html:`Added <b>${rec.n}</b> → <span class="mroute">${rec.r}</span>.`+sassTail('added')}); return; }
+  if(o.pick){ document.getElementById('aiText').value=o.pick; aiSend(); return; }
+}
+
+/* wrap aiAnswer: thanks + no-match sass */
+var _aiAnswerBase=aiAnswer;
+aiAnswer=function(q){
+  var ans=_aiAnswerBase(q);
+  if(ans && ans.html && PROFILE.sass){
+    if(/thank|thx|appreciate/i.test(q)) { var s=sass('thanks',true); if(s) ans={html:s}; }
+    else if(/no (exact )?match/i.test(ans.html)) ans.html+=sassTail('nomatch');
+  }
+  return ans;
+};
+
+/* settings checkbox wiring */
+var _openSet=openSettings;
+openSettings=function(){ _openSet(); var e=document.getElementById('setSass'); if(e) e.checked=!!PROFILE.sass; };
+var _saveSet=saveSettings;
+saveSettings=function(){ var e=document.getElementById('setSass'); if(e) PROFILE.sass=e.checked; _saveSet(); };
+
+/* ---------- boot ---------- *//* ---------- boot ---------- */
 (function init(){
   let last=null;
   try{ last = localStorage.getItem('lastOffice'); }catch(e){}
