@@ -322,6 +322,11 @@
   .help-body{padding:0 16px 16px;font-size:13.5px;line-height:1.55;color:var(--ink);}
   .help-body ul{margin:8px 0 8px 18px;} .help-body li{margin-bottom:5px;} .help-body p{margin:0 0 8px;}
   .help-body b{color:var(--teal);}
+.nearest-banner{background:var(--surface,#fff);border:1px solid var(--clay,#d98b63);
+  border-left:4px solid var(--clay,#d98b63);border-radius:11px;padding:10px 13px;margin:0 0 11px;
+  font-size:13.5px;line-height:1.5;color:var(--ink,#222);}
+.nearest-banner .mroute{margin-left:2px;}
+
 
 </style></style>
 </head>
@@ -569,7 +574,7 @@
   <div class="ai-input">
     <button class="ai-mic" id="aiMic" onclick="toggleMic()" title="Open mic">🎙️</button>
     <input id="aiText" placeholder="Ask about a street or route…"
-           autocomplete="off" onkeydown="if(event.key==='Enter'){aiSend();}">
+           autocomplete="off" onfocus="stopMic()" onkeydown="if(event.key==='Enter'){aiSend();}">
     <button class="ai-send" onclick="aiSend()">→</button>
   </div>
 </div>
@@ -1992,7 +1997,237 @@ openSettings=function(){ _openSet(); var e=document.getElementById('setSass'); i
 var _saveSet=saveSettings;
 saveSettings=function(){ var e=document.getElementById('setSass'); if(e) PROFILE.sass=e.checked; _saveSet(); };
 
-/* ---------- boot ---------- *//* ---------- boot ---------- */
+
+/* ============================================================
+   v3  NEAREST-BLOCK + VOICE->CHAT + FOCUS-STOPS-MIC + GENESIS "OTHER BRAIN"
+   ============================================================ */
+
+/* ----- Genesis server (via the Cloudflare Pages Function, which holds the token) ----- */
+var GENESIS_ENDPOINT='https://genesisaiplatform.com/api/genesis';   /* <- Cloudflare Function URL */
+function askGenesis(question){
+  return fetch(GENESIS_ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({message:question, name:(PROFILE&&PROFILE.name)||''})})
+    .then(function(r){ if(!r.ok) throw new Error('http '+r.status); return r.json(); })
+    .then(function(j){ return (j && (j.reply||j.answer)) || ''; });
+}
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function genesisFallback(q){
+  var nm=(PROFILE&&PROFILE.name)?(' '+PROFILE.name):'';
+  var log=document.getElementById('aiLog'); if(!log) return;
+  if(!document.getElementById('aiPanel').classList.contains('open')) toggleAI();
+  var filler=document.createElement('div'); filler.className='ai-msg bot';
+  filler.innerHTML='Hold on'+esc(nm)+', let me reach out to my other brain for this one…';
+  log.appendChild(filler); scrollAI();
+  askGenesis(q).then(function(reply){
+    var b=document.createElement('div'); b.className='ai-msg bot';
+    b.innerHTML=(reply && reply.trim())? esc(reply).replace(/\n/g,'<br>') : 'My other brain didn’t have an answer for that one.';
+    log.appendChild(b); scrollAI();
+  }).catch(function(e){
+    var b=document.createElement('div'); b.className='ai-msg bot';
+    b.innerHTML='I couldn’t reach my other brain just now — check the connection and try again. I can still look up any street or route for you.';
+    log.appendChild(b); scrollAI();
+  });
+}
+
+/* ----- route the message: lookup locally, or hand off to Genesis ----- */
+function looksConversational(q){
+  var t=(q||'').toLowerCase().trim();
+  if(!t) return false;
+  if(/^(hi|hello|hey|yo|thanks|thank|help)\b/.test(t)) return false;        /* greetings stay local/instant */
+  var trig=((PROFILE&&PROFILE.trigger)||'what route is').toLowerCase();
+  if(t.indexOf(trig)===0) return false;                                      /* explicit lookup */
+  try{ if(parseAddCommand(q)) return false; }catch(e){}                      /* add command */
+  if(/\b(route|zip|office)\b/.test(t) && /\b(what|which|list|show|how many|street)/.test(t)) return false;
+  if(/\b(dr|drive|st|street|ave|avenue|ln|lane|ct|court|rd|road|blvd|way|cir|circle|trl|trail|pl|place|pkwy|parkway|ter|terrace|hwy|loop|cove|cv|run|path|row|bend|xing|pass)\b/.test(t)) return false;
+  if(/^\d/.test(t)) return false;                                            /* an address number */
+  if(/\b(what can you do|who are you|how do i add|how many routes|how do i use)\b/.test(t)) return false; /* app-meta: keep local */
+  if(/\b(how are you|how's it|how is it|what's up|whats up|weather|what time|the time|joke|should i|can you|do you|are you|tell me|explain|incorrect|that's wrong|thats wrong|you're wrong|youre wrong|not right|no that)\b/.test(t)) return true;
+  if(/^(how|what|what's|whats|why|when|who|whose|is|are|was|were|can|could|do|does|did|will|would|should|tell|give|explain|define|say)\b/.test(t)
+     && !/\broute\b/.test(t) && !/\bstreet/.test(t)) return true;           /* a question that isn't a lookup */
+  if(/\?\s*$/.test(t)) return true;                                          /* an unrecognised question */
+  return false;
+}
+function hardNoMatch(ans){
+  return ans && ans.html && !ans.opts && !ans.confirm && /no (exact )?match|no match for/i.test(ans.html);
+}
+
+/* ----- nearest known block when a number is out of range ----- */
+function nearestBlock(number, rows){
+  var best=null, bestScore=Infinity;
+  (rows||[]).forEach(function(r){
+    if(r.f==null||r.l==null) return;
+    var d = number<r.f ? (r.f-number) : (number>r.l ? (number-r.l) : 0);
+    var par;
+    try{ par = parityOK(number, r.o)?0:0.4; }catch(e){ par=0; }
+    var score=d+par;
+    if(score<bestScore){ bestScore=score; best={row:r, d:d, rel:(number<r.f?'below':(number>r.l?'above':'in'))}; }
+  });
+  return best;
+}
+function nearestMsg(number, nb){
+  var r=nb.row, side=r.o==='O'?'odd':(r.o==='E'?'even':'both sides');
+  var lead = nb.rel==='above' ? (number+' is past the top block for <b>'+r.n+'</b>')
+           : nb.rel==='below' ? (number+' is below the known blocks for <b>'+r.n+'</b>')
+           :                     (number+' falls between blocks for <b>'+r.n+'</b>');
+  return lead+' — closest is <span style="font-family:var(--mono,monospace)">'+r.f+'–'+r.l+
+         '</span> on <span class="mroute">'+r.r+'</span> ('+side+').';
+}
+function setVB(r,s,w){
+  var vbR=document.getElementById('vbRoute'),vbS=document.getElementById('vbStreet'),vbW=document.getElementById('vbWait');
+  if(vbR)vbR.textContent=r; if(vbS)vbS.textContent=s; if(vbW)vbW.textContent=w;
+}
+function routeColor(t){ return t==='city'?'#7fd3dc':(t==='hcr'?'#d9cf7a':'#f0a876'); }
+
+/* ----- lookupAnswer override: adds nearest-block for out-of-range ----- */
+function lookupAnswer(text){
+  var res=lookup(text);
+  if(res.mode==='street-fallback' && res.number!=null){
+    var nb=nearestBlock(res.number,res.rows);
+    if(nb) return {html: nearestMsg(res.number, nb), route:nb.row};
+  }
+  if(!res.rows.length) return {html:'No match for <b>'+text+'</b> in '+OFFICE.name+'. Try just the street name.'};
+  var rows=res.rows.slice(0,5);
+  var items=rows.map(function(r){
+    var rng=(r.f!=null&&r.l!=null)?' <span style="color:var(--muted);font-family:var(--mono)">'+r.f+'–'+r.l+(r.o!=='B'?(r.o==='O'?' odd':' even'):'')+'</span>':'';
+    return r.n+' → <span class="mroute">'+r.r+'</span>'+rng;
+  });
+  var head = res.mode==='exact' ? '<b>Route '+res.rows[0].r+'</b><br>' : '';
+  var more = res.rows.length>5 ? '<br><span style="color:var(--muted)">+'+(res.rows.length-5)+' more…</span>':'';
+  var tail=''; try{ if(res.mode==='exact') tail=sassTail('lookup'); }catch(e){}
+  return {html: head + items.join('<br>') + more + tail, route:res.rows[0]};
+}
+
+/* ----- aiSend override: local first, Genesis on conversational / hard no-match ----- */
+function aiSend(){
+  var inp=document.getElementById('aiText'); var t=inp.value.trim(); if(!t) return;
+  aiUser(t); inp.value='';
+  if(looksConversational(t)){ genesisFallback(t); return; }
+  var ans=aiAnswer(t);
+  if(hardNoMatch(ans)){ genesisFallback(t); return; }
+  aiBot(ans);
+}
+
+/* ----- toggleAI override: don't steal focus (and kill the mic) while mic is live ----- */
+function toggleAI(){
+  var p=document.getElementById('aiPanel'); p.classList.toggle('open');
+  if(p.classList.contains('open')){
+    if(!document.getElementById('aiLog').childElementCount) aiBot({html:greet()});
+    try{ maybeWeather(); }catch(e){}
+    setTimeout(function(){var t=document.getElementById('aiText'); if(t && !micOn)t.focus();},120);
+  } else { stopMic(); }
+}
+
+/* ----- processVoice override: logs to chat, nearest-block, graceful handoff ----- */
+function processVoice(){
+  var text=(voiceBuf||'').trim(); voiceBuf='';
+  if(!text) return;
+  /* add-route by voice */
+  var add=null; try{ add=parseAddCommand(text); }catch(e){}
+  if(add && !add.ambiguous){
+    if(!document.getElementById('aiPanel').classList.contains('open')) toggleAI();
+    pendingAdd=add; aiUser('🎙 '+text);
+    aiBot({html:'Add <b>'+add.street+'</b> to <span class="mroute">'+add.route+'</span>'+(add.f!=null?', '+add.f+'–'+add.l:'')+'?', confirm:true});
+    setVB('—', add.street, 'confirm to add'); return;
+  }
+  var after=triggerMatch(text);
+  if(after===null){
+    /* forgiving: maybe they said the street/number without the trigger phrase */
+    var guess=wordsToDigits(text.trim());
+    var gres=null; try{ gres=lookup(guess); }catch(e){}
+    if(gres && (gres.mode==='exact' || (gres.mode==='street-fallback' && gres.number!=null))){
+      after=guess;                                   /* fall through to the lookup handler below */
+    } else if(looksConversational(text) || text.trim().split(/\s+/).length>=3){
+      aiUser('🎙 '+text); setVB('—','','one sec…'); genesisFallback(text); return;
+    } else {
+      var vbw=document.getElementById('vbWait'); if(vbw) vbw.textContent='(say “'+((PROFILE&&PROFILE.trigger)||'what route is')+' …”)';
+      return;
+    }
+  }
+  var q=wordsToDigits(after.trim()); if(!q) return;
+  if(!document.getElementById('aiPanel').classList.contains('open')) toggleAI();
+  aiUser('🎙 '+q);
+  var res=lookup(q);
+  var vbA=document.getElementById('vbAddr'); if(vbA) vbA.textContent=q.toUpperCase();
+  if(res.mode==='exact' && res.rows.length){
+    var top=res.rows[0];
+    setVB(top.r, top.n+(top.f!=null?'  '+top.f+'–'+top.l:''), '● ready — say the next one');
+    var vbR=document.getElementById('vbRoute'); if(vbR) vbR.style.color=routeColor(top.t);
+    AICTX={street:top.n,number:parseInput(q).number,route:top.r};
+    try{logWeak(q);}catch(e){}
+    aiBot(lookupAnswer(q));
+  } else if(res.mode==='street-fallback' && res.number!=null){
+    var nb=nearestBlock(res.number,res.rows);
+    if(nb){
+      setVB(nb.row.r, nb.row.n+'  '+nb.row.f+'–'+nb.row.l, '● nearest block — say the next one');
+      var vbR2=document.getElementById('vbRoute'); if(vbR2) vbR2.style.color=routeColor(nb.row.t);
+      AICTX={street:nb.row.n,number:res.number,route:nb.row.r};
+      aiBot({html: nearestMsg(res.number, nb)});
+    } else {
+      setVB('—','', '');
+      aiBot({html:'I don’t have ranges set for <b>'+(res.street||'that street')+'</b> yet.'});
+    }
+  } else {
+    var p=parseInput(q); var opts=[]; try{ opts=fuzzyStreets(p.street||q,4); }catch(e){}
+    if(opts.length){
+      setVB('?','did you mean…','');
+      var vbR3=document.getElementById('vbRoute'); if(vbR3) vbR3.style.color='#f0a876';
+      aiBot({html:'Heard “'+q+'” — closest:', opts:opts.map(function(n){return {label:n, pick:(p.number?p.number+' ':'')+n};})});
+    } else {
+      setVB('—','','one sec…');
+      genesisFallback(q);
+    }
+  }
+}
+
+/* ----- typed search: surface the nearest block as a banner when out of range ----- */
+var _renderBase=render;
+render=function(raw){
+  _renderBase(raw);
+  try{
+    var res=lookup(raw);
+    if(res.mode==='street-fallback' && res.number!=null){
+      var nb=nearestBlock(res.number,res.rows);
+      if(nb){
+        var box=document.getElementById('results');
+        if(box){
+          var banner=document.createElement('div'); banner.className='nearest-banner';
+          banner.innerHTML=nearestMsg(res.number, nb);
+          box.insertBefore(banner, box.firstChild);
+        }
+      }
+    }
+  }catch(e){}
+};
+
+/* ---------- boot ---------- *//* ---------- boot ---------- *//* ---------- boot ---------- *//* ---------- boot ---------- */
+
+/* ============================================================
+   v4  TRIGRAM-STRENGTHENED MATCHER (phonetic + edit-distance + trigram)
+   ============================================================ */
+function triSet(s){ s=' '+String(s||'')+' '; var g={}; for(var i=0;i<s.length-2;i++) g[s.slice(i,i+3)]=1; return g; }
+function diceTri(a,b){
+  var A=triSet(a),B=triSet(b); var ak=Object.keys(A); var bk=Object.keys(B);
+  if(!ak.length||!bk.length) return 0;
+  var inter=0; for(var i=0;i<ak.length;i++) if(B[ak[i]]) inter++;
+  return (2*inter)/(ak.length+bk.length);
+}
+function fuzzyStreets(q, limit){
+  limit=limit||5;
+  var qs=normalizeStreet(q); if(!qs) return [];
+  var qp=phon(qs);
+  var scored=streetNames().map(function(n){
+    var ns=normalizeStreet(n);
+    var d=lev(qs,ns);
+    var ld=1 - d/Math.max(qs.length,ns.length,1);
+    var tri=diceTri(qs,ns);
+    var sub=(ns.indexOf(qs)!==-1||qs.indexOf(ns)!==-1)?1:0;
+    var ph=(phon(ns)===qp)?1:0;
+    var score=0.45*tri + 0.35*ld + 0.12*sub + 0.08*ph;
+    return {n:n, score:score};
+  }).filter(function(x){return x.score>0.34;}).sort(function(a,b){return b.score-a.score;});
+  return scored.slice(0,limit).map(function(x){return x.n;});
+}
+
 (function init(){
   let last=null;
   try{ last = localStorage.getItem('lastOffice'); }catch(e){}
