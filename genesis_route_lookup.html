@@ -3003,6 +3003,65 @@ function startMic(){
   if(!document.getElementById('aiPanel').classList.contains('open')) toggleAI();
 }
 
+
+/* ============================================================
+   v13  CLOSEST MATCHES SHOW ROUTE + RANGE (actionable fuzzy)
+   ============================================================ */
+function routesForStreet(name){
+  var ns=normalizeStreet(name);
+  return allRoutes().filter(function(r){ return normalizeStreet(r.n)===ns; });
+}
+function streetLine(name){
+  var rows=routesForStreet(name);
+  if(!rows.length) return '<b>'+esc(name)+'</b>';
+  var parts=rows.slice(0,4).map(function(r){
+    var rng=(r.f!=null&&r.l!=null)?(' <span style="opacity:.7">'+r.f+'–'+r.l+(r.o==='O'?' odd':(r.o==='E'?' even':''))+'</span>'):'';
+    return '<span class="mroute">'+r.r+'</span>'+rng;
+  });
+  return '<b>'+esc(name)+'</b> → '+parts.join(', ');
+}
+
+/* re-render answers; the no-exact-match branch now lists routes for each close street */
+function renderVoiceAnswer(turn, res, q){
+  if((res.mode==='exact'||res.mode==='street') && res.rows.length){
+    var odd=null,even=null,both=null;
+    res.rows.forEach(function(r){ if(r.o==='O'&&!odd)odd=r; else if(r.o==='E'&&!even)even=r; else if(r.o==='B'&&!both)both=r; });
+    if(res.mode==='street' && odd && even && odd.r!==even.r && !both){
+      var fh=esc(res.rows[0].n)+': <b>odd</b> → <span class="mroute">'+odd.r+'</span> · <b>even</b> → <span class="mroute">'+even.r+'</span>';
+      AICTX={street:res.rows[0].n,number:null,route:odd.r};
+      try{logWeak(q);}catch(e){}
+      voiceSetA(turn, fh, {html:fh}, 'Odd side, route '+spokenRoute(odd.r)+'. Even side, route '+spokenRoute(even.r)+'.');
+      return true;
+    }
+    var top=res.rows[0];
+    AICTX={street:top.n,number:(res.mode==='exact'?parseInput(q).number:null),route:top.r};
+    try{logWeak(q);}catch(e){}
+    var la=lookupAnswer(q); var sw=sideWord(top.o);
+    voiceSetA(turn, la.html, la, 'Route '+spokenRoute(top.r)+(sw?', '+sw:''));
+    return true;
+  }
+  if(res.mode==='street-fallback' && res.number!=null){
+    var nb=nearestBlock(res.number,res.rows);
+    if(nb){ AICTX={street:nb.row.n,number:res.number,route:nb.row.r};
+      var nmsg=nearestMsg(res.number, nb);
+      voiceSetA(turn, nmsg, {html:nmsg}, 'Nearest block, route '+spokenRoute(nb.row.r));
+    } else { voiceSetA(turn, 'No ranges set yet.', {html:'I don’t have ranges set for <b>'+(res.street||'that street')+'</b> yet.'}, false); }
+    return true;
+  }
+  /* no exact match -> show the closest streets WITH their route + range */
+  var p=parseInput(q); var opts=[]; try{ opts=fuzzyStreets(p.street||q,6); }catch(e){}
+  if(opts.length){
+    var lines=opts.map(streetLine).join('<br>');
+    var fh2='<div style="font-size:14px;font-weight:400;line-height:1.55"><b>Closest match'+(opts.length>1?'es':'')+':</b><br>'+lines+'</div>';
+    var topRows=routesForStreet(opts[0]);
+    AICTX={street:opts[0], number:(p.number||null), route:(topRows[0]?topRows[0].r:'')};
+    var say=false; if(topRows.length){ say=opts[0]+', route '+spokenRoute(topRows[0].r); }
+    voiceSetA(turn, fh2, {html:fh2}, say);
+    return true;
+  }
+  return false;
+}
+
 (function init(){
   let last=null;
   try{ last = localStorage.getItem('lastOffice'); }catch(e){}
